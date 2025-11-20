@@ -326,6 +326,8 @@ const tabButtons = document.querySelectorAll('.mode-tab');
 const modeViews = document.querySelectorAll('.mode-view');
 const btnGenerateNarrative = document.getElementById('btnGenerateNarrative');
 const narrativeContainer = document.getElementById('narrativeContainer');
+const intentOverlay = document.getElementById('intentOverlay');
+const intentChoices = document.querySelectorAll('.intent-choice');
 
 // Store last search items so narrative can reuse them (NEW)
 let lastResultsItems = [];
@@ -347,6 +349,16 @@ function setMode(mode) {
 tabButtons.forEach(btn => {
   btn.addEventListener('click', () => {
     setMode(btn.dataset.mode);
+  });
+});
+
+intentChoices.forEach(choice => {
+  choice.addEventListener('click', () => {
+    const targetMode = choice.dataset.mode || 'results';
+    setMode(targetMode);
+    if (intentOverlay) {
+      intentOverlay.classList.add('hidden');
+    }
   });
 });
 

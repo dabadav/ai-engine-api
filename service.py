@@ -42,6 +42,10 @@ def root():
 def demo():
     return FileResponse("static/index.html")
 
+@app.get("/demo/newQuiz", tags=["Health"], include_in_schema=False)
+def demo_quiz():
+    return FileResponse("static/newQuiz.html")
+
 ### / Search
 searcher = GlobalSearch(collection_name=COLLECTION_NAME)
 

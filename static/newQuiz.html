@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MEMORISE · Exploration Quiz</title>
+  <style>
+    :root {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color-scheme: light;
+      background-color: #ffffff;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #ffffff;
+      color: #111827;
+      display: flex;
+      justify-content: center;
+      padding: 32px 16px;
+    }
+
+    .quiz-container {
+      width: min(680px, 100%);
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 4px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #111827;
+      transition: width 200ms ease;
+    }
+
+    .quiz-header h1 {
+      margin: 8px 0 4px;
+      font-size: clamp(1.4rem, 4vw, 1.8rem);
+      font-weight: 600;
+    }
+
+    .quiz-step {
+      margin: 0;
+      font-size: 0.9rem;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .quiz-note,
+    #questionSubtitle {
+      margin: 0;
+      color: #6b7280;
+      font-size: 0.95rem;
+    }
+
+    .quiz-note {
+      margin-bottom: 4px;
+    }
+
+    .options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .option-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: left;
+      font-size: 1rem;
+      background: #fff;
+      cursor: pointer;
+      transition: border 150ms ease, background 150ms ease;
+    }
+
+    .option-card span {
+      display: block;
+      margin-top: 6px;
+      font-size: 0.9rem;
+      color: #6b7280;
+    }
+
+    .option-card:focus-visible {
+      outline: 2px solid #111827;
+      outline-offset: 2px;
+    }
+
+    .option-card.active {
+      border-color: #111827;
+      background: #f3f4f6;
+    }
+
+    .quiz-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .back-btn,
+    .next-btn {
+      border-radius: 999px;
+      padding: 10px 22px;
+      font-size: 0.95rem;
+      border: none;
+      cursor: pointer;
+    }
+
+    .back-btn {
+      background: transparent;
+      color: #6b7280;
+    }
+
+    .back-btn:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    .next-btn {
+      background: #111827;
+      color: #ffffff;
+    }
+
+    .next-btn:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    .summary-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 24px;
+      background: #f9fafb;
+      display: none;
+    }
+
+    .summary-card.visible {
+      display: block;
+    }
+
+    .summary-card h2 {
+      margin: 0 0 8px;
+    }
+
+    .summary-list {
+      list-style: none;
+      padding: 0;
+      margin: 12px 0 24px;
+      color: #374151;
+    }
+
+    .summary-list li {
+      padding: 6px 0;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 0.95rem;
+    }
+
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      background: #111827;
+      color: #fff;
+      padding: 12px 24px;
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="quiz-container">
+    <div class="progress-track">
+      <div class="progress-bar" id="quizProgress"></div>
+    </div>
+    <div class="quiz-header">
+      <p class="quiz-step" id="questionLabel">Question 1</p>
+      <h1 id="questionTitle"></h1>
+      <p class="quiz-note">We ask a few quick questions to individualize your exploration. Nothing is stored or shared.</p>
+      <p id="questionSubtitle"></p>
+    </div>
+
+    <section class="options-grid" id="optionsGrid"></section>
+
+    <div class="quiz-actions" id="quizActions">
+      <button class="back-btn" id="btnBack" type="button">Back</button>
+      <button class="next-btn" id="btnNext" type="button" disabled>Next</button>
+    </div>
+
+    <section class="summary-card" id="summaryCard">
+      <h2>Ready to explore</h2>
+      <p>We’ll tune the experience based on the following:</p>
+      <ul class="summary-list" id="summaryList"></ul>
+      <a class="cta-btn" href="/demo">
+        Go to the map →
+      </a>
+    </section>
+  </main>
+
+  <script>
+    const steps = [
+      {
+        id: "intent",
+        title: "What are you primarily looking for?",
+        subtitle: "This helps us guide you to the right area first.",
+        options: [
+          { value: "memorials", label: "Memorial highlights", desc: "Key places, plaques, and coordinates." },
+          { value: "stories", label: "Personal testimonies", desc: "Narratives centered on individuals." },
+          { value: "teaching", label: "Teaching resources", desc: "Sets you can reuse for classes or workshops." }
+        ]
+      },
+      {
+        id: "time",
+        title: "How much time do you have right now?",
+        subtitle: "We’ll adjust depth accordingly.",
+        options: [
+          { value: "5", label: "About 5 minutes", desc: "Just show me key highlights." },
+          { value: "10", label: "10–15 minutes", desc: "A balanced experience." },
+          { value: "20", label: "20+ minutes", desc: "I’m ready to dive deep." }
+        ]
+      },
+      {
+        id: "tone",
+        title: "Which tone resonates with you today?",
+        subtitle: "We’ll tailor narratives to match.",
+        options: [
+          { value: "reflective", label: "Reflective", desc: "Quiet, contemplative storytelling." },
+          { value: "investigative", label: "Investigative", desc: "Connect documents, clues, and context." },
+          { value: "hopeful", label: "Hopeful", desc: "Resilience, rebuilding, and new beginnings." }
+        ]
+      }
+    ];
+
+    const quizProgress = document.getElementById("quizProgress");
+    const questionLabel = document.getElementById("questionLabel");
+    const questionTitle = document.getElementById("questionTitle");
+    const questionSubtitle = document.getElementById("questionSubtitle");
+    const optionsGrid = document.getElementById("optionsGrid");
+    const btnBack = document.getElementById("btnBack");
+    const btnNext = document.getElementById("btnNext");
+    const summaryCard = document.getElementById("summaryCard");
+    const summaryList = document.getElementById("summaryList");
+    const quizActions = document.getElementById("quizActions");
+
+    const answers = {};
+    let currentStep = 0;
+
+    function updateProgress() {
+      const progress = (currentStep / steps.length) * 100;
+      quizProgress.style.width = `${progress}%`;
+    }
+
+    function renderStep() {
+      const step = steps[currentStep];
+      summaryCard.classList.remove("visible");
+      optionsGrid.hidden = false;
+      quizActions.hidden = false;
+
+      questionLabel.textContent = `Question ${currentStep + 1} of ${steps.length}`;
+      questionTitle.textContent = step.title;
+      questionSubtitle.textContent = step.subtitle;
+
+      const currentAnswer = answers[step.id]?.value;
+
+      optionsGrid.innerHTML = step.options
+        .map(
+          option => `
+            <button class="option-card ${currentAnswer === option.value ? "active" : ""}" data-value="${option.value}">
+              ${option.label}
+              <span>${option.desc}</span>
+            </button>
+          `
+        )
+        .join("");
+
+      btnBack.disabled = currentStep === 0;
+      btnNext.textContent = currentStep === steps.length - 1 ? "Finish" : "Next";
+      btnNext.disabled = !currentAnswer;
+
+      updateProgress();
+    }
+
+    function showSummary() {
+      quizProgress.style.width = "100%";
+      questionLabel.textContent = "All set";
+      questionTitle.textContent = "We’ll individualize your tour.";
+      questionSubtitle.textContent = "You can change these choices anytime later.";
+
+      const summaryItems = [
+        { label: "Focus", value: answers.intent?.label || "Not specified" },
+        { label: "Available time", value: answers.time?.label || "Not specified" },
+        { label: "Preferred tone", value: answers.tone?.label || "Not specified" }
+      ];
+      summaryList.innerHTML = summaryItems.map(item => `<li><strong>${item.label}:</strong> ${item.value}</li>`).join("");
+
+      summaryCard.classList.add("visible");
+      optionsGrid.hidden = true;
+      quizActions.hidden = true;
+    }
+
+    optionsGrid.addEventListener("click", (event) => {
+      const card = event.target.closest(".option-card");
+      if (!card) return;
+      const value = card.dataset.value;
+      const step = steps[currentStep];
+      const selectedOption = step.options.find(opt => opt.value === value);
+      answers[step.id] = { value, label: selectedOption?.label || value };
+      renderStep();
+    });
+
+    btnBack.addEventListener("click", () => {
+      if (currentStep === 0) return;
+      currentStep -= 1;
+      renderStep();
+    });
+
+    btnNext.addEventListener("click", () => {
+      if (!answers[steps[currentStep].id]) return;
+      if (currentStep === steps.length - 1) {
+        showSummary();
+      } else {
+        currentStep += 1;
+        renderStep();
+      }
+    });
+
+    renderStep();
+  </script>
+</body>
+</html>
