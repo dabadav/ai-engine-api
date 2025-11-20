@@ -31,7 +31,7 @@ app.add_middleware(
 
 @app.get("/demo", tags=["Health"], include_in_schema=False)
 def demo():
-    return FileResponse("static/index.html")
+    return FileResponse("static/intent.html")
 
 @app.get("/demo/app", tags=["Health"], include_in_schema=False)
 def demo_app():
