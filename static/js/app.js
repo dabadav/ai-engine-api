@@ -331,6 +331,7 @@ const intentChoices = document.querySelectorAll('.intent-choice');
 
 // Store last search items so narrative can reuse them (NEW)
 let lastResultsItems = [];
+let lastResultsById = new Map();
 
 function setMode(mode) {
   tabButtons.forEach(btn => {
@@ -624,6 +625,8 @@ if (locationInput) {
 const resultsList = document.getElementById('resultsList');
 const resultsCount = document.getElementById('resultsCount');
 let activeInteraction = null;
+const BLANK_IMAGE =
+  'data:image/gif;base64,R0lGODlhAQABAAD/ACw=';
 
 function truncateText(text, maxLength = 160) {
   if (!text) return '';
@@ -783,6 +786,13 @@ function renderResults(items, sourceLabel = 'Text') {
       : `No results from ${sourceLabel} search.`;
 
   lastResultsItems = items || [];  // NEW: remember for narrative
+  lastResultsById = new Map();
+  lastResultsItems.forEach(it => {
+    const id = getItemId(it);
+    if (id !== null && id !== undefined) {
+      lastResultsById.set(String(id), it);
+    }
+  });
   btnGenerateNarrative.disabled = !lastResultsItems.length;
 
   if (!items.length) {
@@ -806,11 +816,7 @@ function renderResults(items, sourceLabel = 'Text') {
     const img = document.createElement('img');
     img.className = 'result-thumb';
     img.alt = title;
-    if (imageUrl) {
-      img.src = imageUrl;
-    } else {
-      img.src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACw=';
-    }
+    img.src = imageUrl || BLANK_IMAGE;
 
     const info = document.createElement('div');
 
@@ -874,6 +880,68 @@ function renderResults(items, sourceLabel = 'Text') {
     `${items.length} ${countWord}${items.length === 1 ? '' : 's'}`;
 }
 
+function getNarrativeItemById(itemId) {
+  if (itemId === null || itemId === undefined) return null;
+  const key = String(itemId);
+  return lastResultsById.get(key) || null;
+}
+
+function renderNarrativeResultCard(itemId) {
+  const item = getNarrativeItemById(itemId);
+  const payload = item?.payload || {};
+  const title = payload.title || `Item ${itemId ?? ''}`;
+  const creator = payload.topic_label || payload.creator || payload.topic_name || '';
+  const snippet = payload.text ? truncateText(payload.text, 140) : '';
+  const imageUrl = payload.image_url || payload.imageUrl || '';
+  const publicUrl = payload.public_url || payload.publicUrl || '';
+  const badgeLabel = item?.source || '';
+  const dataAttr =
+    itemId !== null && itemId !== undefined ? `data-item-id="${itemId}"` : '';
+
+  return `
+    <div class="result-card narrative-inline-card" ${dataAttr}>
+      <img class="result-thumb" src="${imageUrl || BLANK_IMAGE}" alt="${title}">
+      <div class="narrative-inline-body">
+        <div class="result-title">${title}</div>
+        ${creator ? `<div class="result-creator">${creator}</div>` : ''}
+        ${snippet ? `<div class="result-snippet">${snippet}</div>` : ''}
+        <div class="result-meta-bottom">
+          ${
+            publicUrl
+              ? `<a class="result-link" href="${publicUrl}" target="_blank" rel="noopener noreferrer">Open source ↗</a>`
+              : '<span class="result-link muted-link">No public URL</span>'
+          }
+          ${
+            badgeLabel
+              ? `<span class="badge badge-text">${badgeLabel}</span>`
+              : ''
+          }
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderNarrativeConnection(rel) {
+  if (!rel) return '';
+  const typeLabel = rel.type || 'Relationship';
+  const explanation = rel.explanation || '';
+
+  return `
+    <div class="narrative-connection">
+      ${renderNarrativeResultCard(rel.from)}
+      <div class="connection-arrow">
+        <div class="connection-pill">
+          <span class="connection-type">${typeLabel}</span>
+          ${explanation ? `<span class="connection-text">${explanation}</span>` : ''}
+        </div>
+        <span class="arrow-body" aria-hidden="true"></span>
+      </div>
+      ${renderNarrativeResultCard(rel.to)}
+    </div>
+  `;
+}
+
 // --- Narrative generation / rendering (NEW) -----------------------------
 function renderNarrative(narrative) {
   if (!narrative) {
@@ -907,32 +975,30 @@ function renderNarrative(narrative) {
     const segRels = Array.isArray(seg.relationships) ? seg.relationships : [];
     const transition = seg.transition_to_next || '';
 
+    const connectionsHtml = segRels.length
+      ? `<div class="narrative-flow">
+            ${segRels.map(renderNarrativeConnection).join('')}
+         </div>`
+      : '';
+
+    const cardsFallback = !segRels.length && segItems.length
+      ? `<div class="narrative-item-grid">
+            ${segItems.map(renderNarrativeResultCard).join('')}
+         </div>`
+      : '';
+
+    const bodyContent =
+      connectionsHtml ||
+      cardsFallback ||
+      '<div class="empty-state narrative-empty">This segment does not reference specific items.</div>';
+
     html += `
           <article class="narrative-segment">
-            <h3>${segHeadline}</h3>
-            <small>Segment ID: ${seg.segment_id || '-'}</small>
-            <p>${segSummary}</p>
-            ${segItems.length ? `
-              <div>
-                <strong>Items in this segment:</strong>
-                <ul class="narrative-items">
-                  ${segItems.map(id => `
-                    <li>
-                      <span class="narrative-item-link" data-item-id="${id}">Item ${id}</span>
-                    </li>`).join('')}
-                </ul>
-              </div>
-            ` : ''}
-            ${segRels.length ? `
-              <div>
-                <strong>Connections:</strong>
-                <ul class="narrative-relationships">
-                  ${segRels.map(r => `
-                    <li>${r.from} → ${r.to} (${r.type}): ${r.explanation}</li>
-                  `).join('')}
-                </ul>
-              </div>
-            ` : ''}
+            <div class="narrative-segment-header">
+              <h3>${segHeadline}</h3>
+            </div>
+            ${segSummary ? `<p class="narrative-segment-summary">${segSummary}</p>` : ''}
+            ${bodyContent}
             ${transition ? `<p class="narrative-transition">${transition}</p>` : ''}
           </article>
         `;
@@ -941,15 +1007,20 @@ function renderNarrative(narrative) {
   narrativeContainer.innerHTML = html;
 
   // Wire click on items in narrative to open the detail overlay
-  narrativeContainer.querySelectorAll('.narrative-item-link').forEach(el => {
+  narrativeContainer.querySelectorAll('.result-card.narrative-inline-card[data-item-id]').forEach(el => {
     el.addEventListener('click', () => {
       const id = el.getAttribute('data-item-id');
       if (!id) return;
-      const item = lastResultsItems.find(it => String(getItemId(it)) === String(id));
+      const item = getNarrativeItemById(id);
       if (item) {
-        // Switch back to Results visually, but keep narrative visible if user wants
         showItemDetail(item);
       }
+    });
+
+    el.querySelectorAll('.result-link').forEach(link => {
+      link.addEventListener('click', (event) => {
+        event.stopPropagation();
+      });
     });
   });
 }

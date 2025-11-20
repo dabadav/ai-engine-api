@@ -1,21 +1,9 @@
 [
   {
-    "id": "personal_connection",
-    "alias": "Personal Connection",
-    "title": "Do you have a personal or family connection?",
-    "subtitle": "This helps us responsibly tailor narratives.",
-    "autoAdvance": true,
-    "options": [
-      { "value": "yes", "label": "Yes" },
-      { "value": "no", "label": "No" },
-      { "value": "unsure", "label": "Not sure" }
-    ]
-  },
-  {
     "id": "age_group",
     "alias": "Age",
     "title": "Which age group do you belong to?",
-    "subtitle": "This helps us understand who is using the app.",
+    "subtitle": "This will helps us provide you with relevant content.",
     "autoAdvance": false,
     "options": [
       { "value": "under_18", "label": "Under 18" },
@@ -31,7 +19,7 @@
     "id": "gender",
     "alias": "Gender",
     "title": "How do you describe your gender?",
-    "subtitle": "Optional, but helps us understand our audience.",
+    "subtitle": "Optional, but helps us to personalize your experience.",
     "autoAdvance": true,
     "options": [
       { "value": "female", "label": "Female", "emoji": "🙋‍♀️" },
@@ -167,6 +155,18 @@
       { "value": "zambia", "label": "Zambia", "emoji": "🇿🇲" },
       { "value": "zimbabwe", "label": "Zimbabwe", "emoji": "🇿🇼" },
       { "value": "prefer_not_say", "label": "Prefer not to say", "emoji": "🤫" }
+    ]
+  },
+  {
+    "id": "personal_connection",
+    "alias": "Personal Connection",
+    "title": "Do you have a personal or family connection to the history of Nazi persecution?",
+    "subtitle": "This helps us responsibly tailor narratives.",
+    "autoAdvance": true,
+    "options": [
+      { "value": "yes", "label": "Yes" },
+      { "value": "no", "label": "No" },
+      { "value": "unsure", "label": "Not sure" }
     ]
   }
 ]
