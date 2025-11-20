@@ -222,7 +222,7 @@
         steps.forEach((step, index) => {
           const answer = stored[step.id];
           const label = answer?.label || "Not specified";
-          const emoji = answer?.emoji || "✅";
+          const emoji = answer?.emoji || "〇";
           setTimeout(() => {
             const card = document.createElement("div");
             card.className = "result-card";

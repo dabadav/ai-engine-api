@@ -1701,3 +1701,18 @@ function setupExploreInteractions() {
 document.addEventListener("DOMContentLoaded", () => {
   initExploreSpace();
 });
+(function preloadIntentQuery() {
+  const stored = sessionStorage.getItem('memoriseIntentQuery');
+  if (!stored) return;
+  const textInput = typeof document !== 'undefined'
+    ? document.getElementById('textQuery')
+    : null;
+  if (!textInput) return;
+  textInput.value = stored;
+  sessionStorage.removeItem('memoriseIntentQuery');
+  setTimeout(() => {
+    if (typeof doTextSearch === 'function') {
+      doTextSearch();
+    }
+  }, 50);
+})();
