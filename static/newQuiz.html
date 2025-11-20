@@ -24,7 +24,7 @@
     }
 
     .quiz-container {
-      width: min(880px, 100%);
+      width: min(780px, 100%);
       min-height: calc(100vh - 64px);
       display: flex;
       flex-direction: column;
@@ -36,8 +36,7 @@
     .progress-area {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      width: min(880px, 100%);
+      width: min(780px, 100%);
     }
 
     .progress-meta {
@@ -127,7 +126,19 @@
       transition: border 150ms ease, background 150ms ease;
     }
 
-    .option-card span {
+    .option-heading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .option-emoji {
+      font-size: 1.4rem;
+    }
+
+    .option-text {
       display: block;
       margin-top: 6px;
       font-size: 0.9rem;
@@ -144,35 +155,32 @@
       background: #f3f4f6;
     }
 
-    .quiz-actions {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      margin-top: auto;
-      padding-top: 16px;
-    }
     .content-panel {
       width: min(480px, 100%);
       height: 100%;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 24px;
     }
 
     .next-card {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: auto;
       position: sticky;
       bottom: 16px;
       background: rgba(255, 255, 255, 0.95);
       border-radius: 24px;
       padding: 16px;
-      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
-      border: 1px solid rgba(15, 23, 42, 0.05);
-      display: flex;
       justify-content: center;
+      width: min(520px, 100%);
       backdrop-filter: blur(10px);
     }
 
     .next-btn {
+      width: 400px;
+      height: 54px;
       border-radius: 999px;
       padding: 14px 32px;
       font-size: 1rem;
@@ -254,7 +262,7 @@
       <section class="options-grid" id="optionsGrid"></section>
       <p class="quiz-note" id="questionSubtitle"></p>
 
-      <div class="quiz-actions" id="quizActions">
+      <div class="next-card" id="quizActions">
         <button class="next-btn" id="btnNext" type="button" disabled>Next</button>
       </div>
 
@@ -293,52 +301,55 @@
     }
 
     function renderStep() {
+      if (!steps.length) return;
       const step = steps[currentStep];
+      const autoAdvance = Boolean(step.autoAdvance);
+
       summaryCard.classList.remove("visible");
       optionsGrid.hidden = false;
-      quizActions.hidden = false;
+      quizActions.hidden = autoAdvance;
+      quizActions.style.display = autoAdvance ? "none" : "flex";
+
       questionLabel.textContent = `${currentStep + 1} of ${steps.length}`;
       questionTitle.textContent = step.title;
-      questionSubtitle.textContent = step.subtitle;
+      questionSubtitle.textContent = step.subtitle || "";
 
       const currentAnswer = answers[step.id]?.value;
 
       optionsGrid.innerHTML = step.options
-        .map(
-          option => `
+        .map(option => {
+          const emoji = option.emoji ? `<span class="option-emoji" aria-hidden="true">${option.emoji}</span>` : "";
+          const description = option.desc ? `<span class="option-text">${option.desc}</span>` : "";
+          return `
             <button class="option-card ${currentAnswer === option.value ? "active" : ""}" data-value="${option.value}">
-              ${option.label}
-              <span>${option.desc}</span>
+              <div class="option-heading">
+                ${emoji}
+                <span>${option.label}</span>
+              </div>
+              ${description}
             </button>
-          `
-        )
+          `;
+        })
         .join("");
 
       btnBack.disabled = currentStep === 0;
       btnBack.style.visibility = currentStep === 0 ? "hidden" : "visible";
-      btnNext.textContent = currentStep === steps.length - 1 ? "Finish" : "Next";
-      btnNext.disabled = !currentAnswer;
+
+      if (!autoAdvance) {
+        btnNext.textContent = currentStep === steps.length - 1 ? "Finish" : "Next";
+        btnNext.disabled = !currentAnswer;
+      }
 
       updateProgress();
     }
 
-    function showSummary() {
-      quizProgress.style.width = "100%";
-      questionLabel.textContent = `${steps.length} of ${steps.length}`;
-      questionTitle.textContent = "We’ll individualize your tour.";
-      questionSubtitle.textContent = "You can change these choices anytime later.";
-
-      const summaryItems = [
-        { label: "Focus", value: answers.intent?.label || "Not specified" },
-        { label: "Available time", value: answers.time?.label || "Not specified" },
-        { label: "Preferred tone", value: answers.tone?.label || "Not specified" }
-      ];
-      summaryList.innerHTML = summaryItems.map(item => `<li><strong>${item.label}:</strong> ${item.value}</li>`).join("");
-
-      summaryCard.classList.add("visible");
-      optionsGrid.hidden = true;
-      quizActions.hidden = true;
-      btnBack.style.visibility = "hidden";
+    function finishQuiz() {
+      try {
+        localStorage.setItem("quizResults", JSON.stringify(answers));
+      } catch (err) {
+        console.error("Unable to store quiz results", err);
+      }
+      window.location.href = "/demo/newQuiz/myResults";
     }
 
     optionsGrid.addEventListener("click", (event) => {
@@ -347,7 +358,22 @@
       const value = card.dataset.value;
       const step = steps[currentStep];
       const selectedOption = step.options.find(opt => opt.value === value);
-      answers[step.id] = { value, label: selectedOption?.label || value };
+      answers[step.id] = {
+        value,
+        label: selectedOption?.label || value,
+        emoji: selectedOption?.emoji || null
+      };
+
+      if (step.autoAdvance) {
+        if (currentStep === steps.length - 1) {
+          finishQuiz();
+        } else {
+          currentStep += 1;
+          renderStep();
+        }
+        return;
+      }
+
       renderStep();
     });
 
@@ -360,7 +386,7 @@
     btnNext.addEventListener("click", () => {
       if (!answers[steps[currentStep].id]) return;
       if (currentStep === steps.length - 1) {
-        showSummary();
+        finishQuiz();
       } else {
         currentStep += 1;
         renderStep();

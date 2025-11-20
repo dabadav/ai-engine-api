@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Your Exploration Is Ready</title>
+  <style>
+    :root {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color-scheme: light;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top, #f8fafc, #e2e8f0 60%);
+      color: #0f172a;
+      padding: 24px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 28px;
+      padding: 32px;
+      width: min(560px, 100%);
+      box-shadow: 0 35px 90px rgba(15, 23, 42, 0.25);
+      border: 1px solid rgba(15, 23, 42, 0.05);
+      text-align: center;
+      overflow: hidden;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(1.8rem, 4vw, 2.4rem);
+    }
+
+    p {
+      margin: 0 0 24px;
+      color: #475569;
+      font-size: 1rem;
+    }
+
+    .pulse {
+      width: 180px;
+      height: 180px;
+      margin: 0 auto 24px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #fcd34d, #f97316);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 3rem;
+      animation: pulse 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(0.85);
+        box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.45);
+      }
+      70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 30px rgba(249, 115, 22, 0);
+      }
+      100% {
+        transform: scale(0.85);
+        box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+      }
+    }
+
+    .status {
+      font-size: 1rem;
+      color: #0f172a;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .timer {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      margin-top: 6px;
+    }
+
+    .results {
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .result-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border-radius: 18px;
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.08);
+      background: #ffffff;
+      opacity: 0;
+      transform: translateY(15px);
+      animation: reveal 0.8s ease-out forwards;
+      height: 55px;
+    }
+
+    .result-card.placeholder {
+      animation: none;
+      opacity: 1;
+      background: rgba(241, 245, 249, 0.8);
+      border-color: rgba(148, 163, 184, 0.35);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .result-card.placeholder::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.7) 50%, transparent 100%);
+      transform: translateX(-100%);
+      animation: sheen 1.6s infinite;
+    }
+
+    .placeholder-emoji {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.4);
+    }
+
+    .placeholder-lines {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .placeholder-lines span {
+      height: 12px;
+      border-radius: 8px;
+      background: rgba(148, 163, 184, 0.5);
+    }
+
+    .placeholder-lines span:last-child {
+      width: 60%;
+    }
+
+    .result-card .emoji {
+      font-size: 1.4rem;
+      width: 2rem;
+    }
+
+    .result-line {
+      font-size: 0.95rem;
+      color: #0f172a;
+      font-weight: 500;
+    }
+
+    .result-line span {
+      color: #475569;
+    }
+
+    @keyframes reveal {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes sheen {
+      to {
+        transform: translateX(100%);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="pulse">✨</div>
+    <h1>Your walkthrough is ready</h1>
+    <p>We curated the experience based on your quiz answers. Take a look while we prepare the map.</p>
+    <div class="status">Individualizing results…</div>
+    <div class="results" id="resultsList"></div>
+    <!-- <div class="timer" id="timer">Redirecting in 6 seconds</div> -->
+  </div>
+
+  <script>
+    async function renderResults() {
+      const listEl = document.getElementById("resultsList");
+      let stored = {};
+      try {
+        stored = JSON.parse(localStorage.getItem("quizResults") || "{}");
+      } catch (err) {
+        console.warn("Unable to read quiz results", err);
+      }
+
+      try {
+        const res = await fetch("/static/quiz-steps.json", { cache: "no-cache" });
+        const steps = await res.json();
+
+        listEl.innerHTML = "";
+        const placeholders = steps.map(() => {
+          const placeholder = document.createElement("div");
+          placeholder.className = "result-card placeholder";
+          placeholder.innerHTML = `
+            <div class="placeholder-emoji"></div>
+            <div class="placeholder-lines">
+              <span></span>
+              <span></span>
+            </div>
+          `;
+          listEl.appendChild(placeholder);
+          return placeholder;
+        });
+
+        steps.forEach((step, index) => {
+          const answer = stored[step.id];
+          const label = answer?.label || "Not specified";
+          const emoji = answer?.emoji || "✅";
+          setTimeout(() => {
+            const card = document.createElement("div");
+            card.className = "result-card";
+            card.style.animationDelay = `${index * 0.35}s`;
+            card.innerHTML = `
+              <div class="emoji">${emoji}</div>
+              <div class="result-line">
+                ${step.alias}: <span>${label}</span>
+              </div>
+            `;
+            placeholders[index].replaceWith(card);
+          }, index * 350);
+        });
+      } catch (err) {
+        console.error("Failed to load quiz steps", err);
+        listEl.innerHTML = "<p>We’ll take you to the map in a moment.</p>";
+      }
+    }
+
+    function startTimer() {
+      const timerEl = document.getElementById("timer");
+      let remaining = 5;
+      const interval = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearInterval(interval);
+          window.location.href = "/demo";
+          return;
+        }
+        // timerEl.textContent = `Redirecting in ${remaining} seconds`;
+      }, 1000);
+    }
+
+    renderResults();
+    startTimer();
+  </script>
+</body>
+</html>

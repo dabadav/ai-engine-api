@@ -46,6 +46,10 @@ def demo():
 def demo_quiz():
     return FileResponse("static/newQuiz.html")
 
+
+@app.get("/demo/newQuiz/myResults", tags=["Health"], include_in_schema=False)
+def demo_quiz_results():
+    return FileResponse("static/newQuizResults.html")
 ### / Search
 searcher = GlobalSearch(collection_name=COLLECTION_NAME)
 
