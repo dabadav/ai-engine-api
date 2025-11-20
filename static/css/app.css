@@ -345,6 +345,14 @@ input[type="text"]:focus {
   cursor: grabbing;
 }
 
+.explore-point {
+  transition: r 120ms ease, opacity 120ms ease, stroke 120ms ease;
+}
+
+.explore-point.neighbor-highlight {
+  opacity: 1;
+}
+
 .explore-hover-card {
   margin-top: 8px;
   padding: 8px 10px;
@@ -629,6 +637,18 @@ input[type="range"] {
   margin-bottom: 4px;
 }
 
+.result-snippet {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.35;
+  margin-bottom: 4px;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .result-meta-bottom {
   display: flex;
   justify-content: space-between;
@@ -661,6 +681,11 @@ input[type="range"] {
 .badge-text {
   border-color: #E67702;
   color: #E67702;
+}
+
+.badge-explore {
+  border-color: #4C6EF5;
+  color: #3B5BDB;
 }
 
 .empty-state {

@@ -625,6 +625,13 @@ const resultsList = document.getElementById('resultsList');
 const resultsCount = document.getElementById('resultsCount');
 let activeInteraction = null;
 
+function truncateText(text, maxLength = 160) {
+  if (!text) return '';
+  const clean = String(text).trim();
+  if (clean.length <= maxLength) return clean;
+  return clean.slice(0, maxLength - 1) + '…';
+}
+
 function normalizeResults(json) {
   if (!json || typeof json !== 'object') return [];
   if (json.result) {
@@ -756,15 +763,31 @@ async function handleResultClick(item) {
   showItemDetail(item);
 }
 
-function renderResults(items, sourceLabel) {
-  const typeBadgeClass = sourceLabel === 'Geo' ? 'badge badge-geo' : 'badge badge-text';
+function renderResults(items, sourceLabel = 'Text') {
+  const badgeText =
+    sourceLabel === 'Geo'
+      ? 'Geo'
+      : sourceLabel === 'Explore'
+        ? 'Explore'
+        : 'Text';
+  const typeBadgeClass =
+    sourceLabel === 'Geo'
+      ? 'badge badge-geo'
+      : sourceLabel === 'Explore'
+        ? 'badge badge-explore'
+        : 'badge badge-text';
+  const countWord = sourceLabel === 'Explore' ? 'neighbor' : 'result';
+  const emptyMessage =
+    sourceLabel === 'Explore'
+      ? 'No nearby documents for this spot. Hover over another cluster.'
+      : `No results from ${sourceLabel} search.`;
 
   lastResultsItems = items || [];  // NEW: remember for narrative
   btnGenerateNarrative.disabled = !lastResultsItems.length;
 
   if (!items.length) {
-    resultsList.innerHTML = `<div class="empty-state">No results from ${sourceLabel} search.</div>`;
-    resultsCount.textContent = '0 results';
+    resultsList.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
+    resultsCount.textContent = `0 ${countWord}s`;
     return;
   }
 
@@ -773,7 +796,7 @@ function renderResults(items, sourceLabel) {
     const payload = item.payload || {};
 
     const title = payload.title || '(No title)';
-    const creator = payload.creator || '';
+    const creator = payload.topic_label || payload.creator || '';
     const imageUrl = payload.image_url || '';
     const publicUrl = payload.public_url || '';
 
@@ -797,7 +820,20 @@ function renderResults(items, sourceLabel) {
 
     const creatorEl = document.createElement('div');
     creatorEl.className = 'result-creator';
-    creatorEl.textContent = creator ? `Creator: ${creator}` : 'Creator unknown';
+    const creatorLabel = sourceLabel === 'Explore' ? 'Cluster' : 'Creator';
+    creatorEl.textContent = creator
+      ? `${creatorLabel}: ${creator}`
+      : sourceLabel === 'Explore'
+        ? 'Cluster unknown'
+        : 'Creator unknown';
+
+    const snippetText = sourceLabel === 'Explore' ? truncateText(payload.text, 180) : '';
+    let snippetEl = null;
+    if (snippetText) {
+      snippetEl = document.createElement('div');
+      snippetEl.className = 'result-snippet';
+      snippetEl.textContent = snippetText;
+    }
 
     const bottom = document.createElement('div');
     bottom.className = 'result-meta-bottom';
@@ -811,13 +847,16 @@ function renderResults(items, sourceLabel) {
 
     const badge = document.createElement('span');
     badge.className = typeBadgeClass;
-    badge.textContent = sourceLabel === 'Geo' ? 'Geo' : 'Text';
+    badge.textContent = badgeText;
 
     bottom.appendChild(link);
     bottom.appendChild(badge);
 
     info.appendChild(titleEl);
     info.appendChild(creatorEl);
+    if (snippetEl) {
+      info.appendChild(snippetEl);
+    }
     info.appendChild(bottom);
 
     card.appendChild(img);
@@ -832,7 +871,7 @@ function renderResults(items, sourceLabel) {
   });
 
   resultsCount.textContent =
-    items.length + ' result' + (items.length !== 1 ? 's' : '');
+    `${items.length} ${countWord}${items.length === 1 ? '' : 's'}`;
 }
 
 // --- Narrative generation / rendering (NEW) -----------------------------
@@ -1045,8 +1084,323 @@ const hoverMeta = document.getElementById("hoverMeta");
 const topicFilter = document.getElementById("topicFilter");
 
 let explorePoints = [];
+let exploreVisiblePoints = [];
 let exploreViewBox = { x: 0, y: 0, width: 100, height: 100 };
 let exploreRootGroup;
+let explorePointRadius = 0.02;
+const explorePointElements = new Map();
+let exploreIsPanning = false;
+let exploreHoverFrame = null;
+let explorePendingEvent = null;
+let exploreLastResultsKey = "";
+
+// ---------- Helpers for client-side projection ----------------------------
+
+function dotProduct(a, b) {
+  let sum = 0;
+  const len = Math.min(a.length, b.length);
+  for (let i = 0; i < len; i++) {
+    sum += a[i] * b[i];
+  }
+  return sum;
+}
+
+function normalizeVector(vec) {
+  let normSq = 0;
+  for (let i = 0; i < vec.length; i++) {
+    normSq += vec[i] * vec[i];
+  }
+  const norm = Math.sqrt(normSq);
+  if (!isFinite(norm) || norm === 0) {
+    return 0;
+  }
+  for (let i = 0; i < vec.length; i++) {
+    vec[i] /= norm;
+  }
+  return norm;
+}
+
+function randomUnitVector(dim) {
+  const arr = new Array(dim);
+  for (let i = 0; i < dim; i++) {
+    arr[i] = Math.random() - 0.5;
+  }
+  if (normalizeVector(arr) === 0) {
+    for (let i = 0; i < dim; i++) {
+      arr[i] = 0;
+    }
+    arr[0] = 1;
+  }
+  return arr;
+}
+
+function computePrincipalComponents(data, count) {
+  if (!data.length) return [];
+  const dim = data[0].length;
+  const components = [];
+  const maxIter = 50;
+  for (let c = 0; c < count; c++) {
+    let vec = randomUnitVector(dim);
+    let converged = false;
+    let validComponent = false;
+
+    for (let iter = 0; iter < maxIter; iter++) {
+      const next = new Array(dim).fill(0);
+      for (const sample of data) {
+        const dot = dotProduct(sample, vec);
+        for (let i = 0; i < dim; i++) {
+          next[i] += dot * sample[i];
+        }
+      }
+
+      for (const basis of components) {
+        const proj = dotProduct(next, basis);
+        for (let i = 0; i < dim; i++) {
+          next[i] -= proj * basis[i];
+        }
+      }
+
+      if (!normalizeVector(next)) {
+        break;
+      }
+      validComponent = true;
+
+      let diff = 0;
+      for (let i = 0; i < dim; i++) {
+        const delta = next[i] - vec[i];
+        diff += delta * delta;
+      }
+      vec = next;
+
+      if (diff < 1e-6) {
+        converged = true;
+        break;
+      }
+    }
+
+    if (!validComponent) break;
+
+    components.push(vec.slice());
+  }
+  return components;
+}
+
+function projectVectorsTo2D(vectors) {
+  if (!vectors.length) return null;
+  const dim = vectors[0].length;
+  if (dim < 2) return null;
+
+  const mean = new Array(dim).fill(0);
+  for (const vec of vectors) {
+    for (let i = 0; i < dim; i++) {
+      mean[i] += vec[i];
+    }
+  }
+  for (let i = 0; i < dim; i++) {
+    mean[i] /= vectors.length;
+  }
+
+  const centered = vectors.map((vec) => {
+    const row = new Array(dim);
+    for (let i = 0; i < dim; i++) {
+      row[i] = vec[i] - mean[i];
+    }
+    return row;
+  });
+
+  const components = computePrincipalComponents(centered, 2);
+  if (components.length < 2) {
+    return null;
+  }
+
+  return centered.map((sample) => [
+    dotProduct(sample, components[0]),
+    dotProduct(sample, components[1]),
+  ]);
+}
+
+function ensureExploreCoordinates(items) {
+  const needsProjection = items.some(
+    (item) => typeof item.x !== "number" || typeof item.y !== "number"
+  );
+  if (!needsProjection) return;
+
+  const vectors = [];
+  const indexMap = [];
+  for (let i = 0; i < items.length; i++) {
+    const vec = items[i].vector;
+    if (Array.isArray(vec) && vec.length >= 2) {
+      vectors.push(vec);
+      indexMap.push(i);
+    }
+  }
+
+  if (!vectors.length) {
+    console.warn("Topic map: no vectors available for projection.");
+    return;
+  }
+
+  let coords = projectVectorsTo2D(vectors);
+  if (!coords) {
+    console.warn("Topic map: PCA projection failed, falling back to first two dimensions.");
+    coords = vectors.map((vec) => [vec[0] || 0, vec[1] || 0]);
+  }
+
+  indexMap.forEach((itemIdx, coordIdx) => {
+    const [x, y] = coords[coordIdx];
+    items[itemIdx].x = x;
+    items[itemIdx].y = y;
+  });
+
+  let fallbackCounter = 0;
+  for (const item of items) {
+    if (typeof item.x !== "number" || typeof item.y !== "number") {
+      item.x = fallbackCounter * 0.1;
+      item.y = 0;
+      fallbackCounter += 1;
+    }
+  }
+}
+
+function svgPointFromClient(event) {
+  if (!exploreSvg) return null;
+  const svgRect = exploreSvg.getBoundingClientRect();
+  const withinX = event.clientX >= svgRect.left && event.clientX <= svgRect.right;
+  const withinY = event.clientY >= svgRect.top && event.clientY <= svgRect.bottom;
+  if (!withinX || !withinY) return null;
+  const px = (event.clientX - svgRect.left) / svgRect.width;
+  const py = (event.clientY - svgRect.top) / svgRect.height;
+  return {
+    x: exploreViewBox.x + px * exploreViewBox.width,
+    y: exploreViewBox.y + py * exploreViewBox.height,
+  };
+}
+
+function getNeighborRadius() {
+  const base = Math.max(exploreViewBox.width, exploreViewBox.height);
+  return Math.max(base * 0.08, 0.05);
+}
+
+function findNeighborsAtPosition(x, y, options = {}) {
+  const limit = options.limit ?? 12;
+  const radius = options.radius ?? getNeighborRadius();
+  const matches = [];
+  const dataset = exploreVisiblePoints.length ? exploreVisiblePoints : explorePoints;
+  for (const point of dataset) {
+    if (typeof point.x !== "number" || typeof point.y !== "number") continue;
+    const dx = point.x - x;
+    const dy = point.y - y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (!Number.isFinite(dist)) continue;
+    if (dist <= radius) {
+      matches.push({ point, distance: dist });
+    }
+  }
+  matches.sort((a, b) => a.distance - b.distance);
+  return matches.slice(0, limit);
+}
+
+function highlightExploreNeighbors(neighbors) {
+  const highlightMap = new Map();
+  neighbors.forEach((entry, idx) => {
+    highlightMap.set(String(entry.point.id), idx);
+  });
+
+  explorePointElements.forEach((circle, id) => {
+    if (!circle) return;
+    if (highlightMap.has(id)) {
+      circle.classList.add("neighbor-highlight");
+      const idx = highlightMap.get(id);
+      const scale = idx === 0 ? 2 : 1.35;
+      circle.setAttribute("r", (explorePointRadius * scale).toFixed(4));
+      circle.setAttribute("stroke", "rgba(15, 23, 42, 0.35)");
+      circle.setAttribute("stroke-width", 0.01);
+    } else {
+      circle.classList.remove("neighbor-highlight");
+      circle.setAttribute("r", explorePointRadius);
+      circle.setAttribute("stroke", "none");
+      circle.setAttribute("stroke-width", 0);
+    }
+  });
+}
+
+function neighborToResult(neighbor) {
+  const { point, distance } = neighbor;
+  const snippet = (point.text || "").trim();
+  const fallbackTitle = snippet
+    ? snippet.slice(0, 80) + (snippet.length > 80 ? "…" : "")
+    : `Document ${point.id}`;
+  const title = point.topic || fallbackTitle;
+
+  return {
+    id: point.id,
+    score: Number.isFinite(distance) ? Number(distance.toFixed(3)) : undefined,
+    payload: {
+      title,
+      text: snippet,
+      topic_label: point.label || "",
+      topic_name: point.topic || "",
+      explore_distance: distance,
+    },
+  };
+}
+
+function updateExploreResultsFromNeighbors(neighbors, trigger = "hover", { force = false } = {}) {
+  if (!neighbors.length) return;
+  const key = neighbors.map((entry) => entry.point.id).join("|");
+  if (!force && trigger === "hover" && key === exploreLastResultsKey) {
+    return;
+  }
+  exploreLastResultsKey = key;
+  const mapped = neighbors.map(neighborToResult);
+  renderResults(mapped, "Explore");
+  const action = trigger === "click" ? "Pinned" : "Hovering";
+  exploreInfo.textContent = `${action} ${mapped.length} nearby document${mapped.length === 1 ? "" : "s"}.`;
+}
+
+function processExplorePointerEvent(event, trigger) {
+  if (!exploreSvg || !explorePoints.length) return;
+  const svgPoint = svgPointFromClient(event);
+  if (!svgPoint) return;
+  const neighbors = findNeighborsAtPosition(svgPoint.x, svgPoint.y);
+  highlightExploreNeighbors(neighbors);
+  if (!neighbors.length) {
+    if (trigger === "click") {
+      exploreInfo.textContent = "No nearby documents here. Try another region.";
+    } else {
+      exploreInfo.textContent = "Hover to preview density. Click to send neighbors to results.";
+    }
+    return;
+  }
+  if (trigger === "click") {
+    updateExploreResultsFromNeighbors(neighbors, trigger, { force: true });
+  } else {
+    exploreInfo.textContent = `Hovering near ${neighbors.length} document${neighbors.length === 1 ? "" : "s"}. Click to preview them.`;
+  }
+}
+
+function handleExplorePointerMove(event) {
+  if (exploreIsPanning) return;
+  explorePendingEvent = {
+    clientX: event.clientX,
+    clientY: event.clientY,
+  };
+  if (exploreHoverFrame) return;
+  exploreHoverFrame = window.requestAnimationFrame(() => {
+    exploreHoverFrame = null;
+    if (!explorePendingEvent) return;
+    processExplorePointerEvent(explorePendingEvent, "hover");
+    explorePendingEvent = null;
+  });
+}
+
+function handleExploreClick(event) {
+  if (exploreIsPanning) return;
+  processExplorePointerEvent(
+    { clientX: event.clientX, clientY: event.clientY },
+    "click"
+  );
+}
 
 // Utility: load JSONL file
 async function loadJsonl(url) {
@@ -1067,6 +1421,7 @@ async function initExploreSpace() {
     exploreInfo.textContent = "Loading topic map…";
 
     const items = await loadJsonl("/static/data/topics.jsonl");
+    ensureExploreCoordinates(items);
     explorePoints = items;
 
     if (!items.length) {
@@ -1091,12 +1446,18 @@ async function initExploreSpace() {
     const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
+    const spanX = Math.max(maxX - minX, 1e-6);
+    const spanY = Math.max(maxY - minY, 1e-6);
+    const dominantSpan = Math.max(spanX, spanY);
+    const padding = Math.max(dominantSpan * 0.1, 0.05);
 
-    const padding = 1; // your coords are already close, 1 is enough
     exploreViewBox.x = minX - padding;
     exploreViewBox.y = minY - padding;
-    exploreViewBox.width = (maxX - minX) + 2 * padding;
-    exploreViewBox.height = (maxY - minY) + 2 * padding;
+    exploreViewBox.width = spanX + padding * 2;
+    exploreViewBox.height = spanY + padding * 2;
+
+    const baseSize = Math.max(exploreViewBox.width, exploreViewBox.height);
+    explorePointRadius = Math.min(Math.max(baseSize * 0.006, 0.004), 0.02);
 
     exploreSvg.setAttribute(
       "viewBox",
@@ -1111,7 +1472,7 @@ async function initExploreSpace() {
 
     setupExploreInteractions();
 
-    exploreInfo.textContent = `Loaded ${items.length} items across ${labels.length} clusters.`;
+    exploreInfo.textContent = `Loaded ${items.length} items across ${labels.length} clusters. Hover or click to surface neighbors.`;
   } catch (err) {
     console.error("Error loading explore space:", err);
     exploreInfo.textContent = "Error loading topic map.";
@@ -1122,12 +1483,15 @@ async function initExploreSpace() {
 function drawExplorePoints() {
   if (!exploreRootGroup) return;
   exploreRootGroup.innerHTML = "";
+  explorePointElements.clear();
+  highlightExploreNeighbors([]);
 
   const filterValue = topicFilter.value;
   const filtered =
     filterValue === "all"
       ? explorePoints
       : explorePoints.filter((p) => String(p.label) === filterValue);
+  exploreVisiblePoints = filtered;
 
   const topicColors = {};
   const colorPalette = [
@@ -1148,12 +1512,16 @@ function drawExplorePoints() {
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     circle.setAttribute("cx", p.x);
     circle.setAttribute("cy", p.y);
-    circle.setAttribute("r", 0.15); // small because your coords are tight
+    circle.setAttribute("r", explorePointRadius);
     circle.setAttribute("fill", getLabelColor(p.label));
     circle.setAttribute("fill-opacity", "0.9");
     circle.setAttribute("data-id", p.id);
     circle.setAttribute("data-label", p.label);
     circle.setAttribute("data-topic", p.topic);
+    circle.setAttribute("stroke", "none");
+    circle.setAttribute("stroke-width", 0);
+    circle.classList.add("explore-point");
+    explorePointElements.set(String(p.id), circle);
 
     const title = p.text?.slice(0, 80) + (p.text && p.text.length > 80 ? "…" : "");
     const topicName = p.topic?.replace(/\*\*/g, "") || "";
@@ -1182,22 +1550,24 @@ function drawExplorePoints() {
 
 // Basic pan/zoom for SVG
 function setupExploreInteractions() {
-  let isPanning = false;
   let lastX = 0;
   let lastY = 0;
 
   exploreSvg.addEventListener("mousedown", (e) => {
-    isPanning = true;
+    exploreIsPanning = true;
     lastX = e.clientX;
     lastY = e.clientY;
   });
 
   window.addEventListener("mouseup", () => {
-    isPanning = false;
+    exploreIsPanning = false;
   });
 
   exploreSvg.addEventListener("mousemove", (e) => {
-    if (!isPanning) return;
+    if (!exploreIsPanning) {
+      handleExplorePointerMove(e);
+      return;
+    }
 
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
@@ -1243,6 +1613,16 @@ function setupExploreInteractions() {
 
   topicFilter.addEventListener("change", () => {
     drawExplorePoints();
+    exploreLastResultsKey = "";
+    exploreInfo.textContent = "Filter applied. Hover to explore nearby stories.";
+  });
+
+  exploreSvg.addEventListener("click", handleExploreClick);
+  exploreSvg.addEventListener("mouseleave", () => {
+    if (!exploreIsPanning) {
+      highlightExploreNeighbors([]);
+    }
+    explorePendingEvent = null;
   });
 }
 
