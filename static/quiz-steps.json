@@ -1,0 +1,32 @@
+[
+  {
+    "id": "intent",
+    "title": "What are you primarily looking for?",
+    "subtitle": "This helps us guide you to the right area first.",
+    "options": [
+      { "value": "memorials", "label": "Memorial highlights", "desc": "Key places, plaques, and coordinates." },
+      { "value": "stories", "label": "Personal testimonies", "desc": "Narratives centered on individuals." },
+      { "value": "teaching", "label": "Teaching resources", "desc": "Sets you can reuse for classes or workshops." }
+    ]
+  },
+  {
+    "id": "time",
+    "title": "How much time do you have right now?",
+    "subtitle": "We’ll adjust depth accordingly.",
+    "options": [
+      { "value": "5", "label": "About 5 minutes", "desc": "Just show me key highlights." },
+      { "value": "10", "label": "10–15 minutes", "desc": "A balanced experience." },
+      { "value": "20", "label": "20+ minutes", "desc": "I’m ready to dive deep." }
+    ]
+  },
+  {
+    "id": "tone",
+    "title": "Which tone resonates with you today?",
+    "subtitle": "We’ll tailor narratives to match.",
+    "options": [
+      { "value": "reflective", "label": "Reflective", "desc": "Quiet, contemplative storytelling." },
+      { "value": "investigative", "label": "Investigative", "desc": "Connect documents, clues, and context." },
+      { "value": "hopeful", "label": "Hopeful", "desc": "Resilience, rebuilding, and new beginnings." }
+    ]
+  }
+]

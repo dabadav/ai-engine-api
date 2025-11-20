@@ -20,14 +20,30 @@
       color: #111827;
       display: flex;
       justify-content: center;
-      padding: 32px 16px;
+      padding: 20px 20px 16px;
     }
 
     .quiz-container {
-      width: min(680px, 100%);
+      width: min(880px, 100%);
+      min-height: calc(100vh - 64px);
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      align-items: center;
+      gap: 40px;
+      padding-bottom: 32px;
+    }
+
+    .progress-area {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      width: min(880px, 100%);
+    }
+
+    .progress-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
     .progress-track {
@@ -45,29 +61,53 @@
       transition: width 200ms ease;
     }
 
+    .quiz-header {
+      text-align: center;
+    }
+
     .quiz-header h1 {
       margin: 8px 0 4px;
-      font-size: clamp(1.4rem, 4vw, 1.8rem);
+      font-size: 1.8rem;
       font-weight: 600;
     }
 
-    .quiz-step {
-      margin: 0;
+    .progress-count {
       font-size: 0.9rem;
       color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
     }
 
-    .quiz-note,
-    #questionSubtitle {
-      margin: 0;
-      color: #6b7280;
-      font-size: 0.95rem;
+    .progress-back {
+      border: none;
+      background: transparent;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      color: #111827;
+      cursor: pointer;
+      visibility: hidden;
+    }
+
+    .progress-back:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    .progress-back svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
     }
 
     .quiz-note {
-      margin-bottom: 4px;
+      margin: 0 0 4px;
+      color: #6b7280;
+      font-size: 0.95rem;
+      text-align: center;
     }
 
     .options-grid {
@@ -106,39 +146,41 @@
 
     .quiz-actions {
       display: flex;
-      justify-content: flex-end;
+      justify-content: center;
       gap: 12px;
+      margin-top: auto;
+      padding-top: 16px;
+    }
+    .content-panel {
+      width: min(480px, 100%);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
 
-    .back-btn,
+    .next-card {
+      position: sticky;
+      bottom: 16px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 24px;
+      padding: 16px;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+      border: 1px solid rgba(15, 23, 42, 0.05);
+      display: flex;
+      justify-content: center;
+      backdrop-filter: blur(10px);
+    }
+
     .next-btn {
       border-radius: 999px;
-      padding: 10px 22px;
-      font-size: 0.95rem;
+      padding: 14px 32px;
+      font-size: 1rem;
       border: none;
       cursor: pointer;
-    }
-
-    .back-btn {
-      background: transparent;
-      color: #6b7280;
-    }
-
-    .back-btn:disabled {
-      opacity: 0.4;
-      cursor: default;
-    }
-
-    .next-btn {
       background: #111827;
       color: #ffffff;
     }
-
-    .next-btn:disabled {
-      opacity: 0.45;
-      cursor: default;
-    }
-
     .summary-card {
       border: 1px solid #e5e7eb;
       border-radius: 16px;
@@ -180,69 +222,55 @@
       font-size: 0.95rem;
     }
   </style>
+  <style>
+    @media (max-width: 1020px) {
+      .progress-area {
+        width: min(520px, 100%);
+      }
+    }
+  </style>
 </head>
 <body>
   <main class="quiz-container">
-    <div class="progress-track">
-      <div class="progress-bar" id="quizProgress"></div>
+    <div class="progress-area">
+      <div class="progress-meta">
+        <button class="progress-back" id="btnBack" type="button">
+          <svg viewBox="0 0 24 24">
+            <path d="M15 18l-6-6 6-6"></path>
+          </svg>
+        </button>
+        <span class="progress-count" id="questionLabel">1 of 3</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-bar" id="quizProgress"></div>
+      </div>
     </div>
-    <div class="quiz-header">
-      <p class="quiz-step" id="questionLabel">Question 1</p>
-      <h1 id="questionTitle"></h1>
-      <p class="quiz-note">We ask a few quick questions to individualize your exploration. Nothing is stored or shared.</p>
-      <p id="questionSubtitle"></p>
+    <div class="content-panel">
+      <div class="quiz-header">
+        <h1 id="questionTitle"></h1>
+        <!-- <p class="quiz-note">We ask a few quick questions to individualize your exploration. Nothing is stored or shared.</p> -->
+      </div>
+
+      <section class="options-grid" id="optionsGrid"></section>
+      <p class="quiz-note" id="questionSubtitle"></p>
+
+      <div class="quiz-actions" id="quizActions">
+        <button class="next-btn" id="btnNext" type="button" disabled>Next</button>
+      </div>
+
+      <section class="summary-card" id="summaryCard">
+        <h2>Ready to explore</h2>
+        <p>We’ll tune the experience based on the following:</p>
+        <ul class="summary-list" id="summaryList"></ul>
+        <a class="cta-btn" href="/demo">
+          Go to the map →
+        </a>
+      </section>
     </div>
-
-    <section class="options-grid" id="optionsGrid"></section>
-
-    <div class="quiz-actions" id="quizActions">
-      <button class="back-btn" id="btnBack" type="button">Back</button>
-      <button class="next-btn" id="btnNext" type="button" disabled>Next</button>
-    </div>
-
-    <section class="summary-card" id="summaryCard">
-      <h2>Ready to explore</h2>
-      <p>We’ll tune the experience based on the following:</p>
-      <ul class="summary-list" id="summaryList"></ul>
-      <a class="cta-btn" href="/demo">
-        Go to the map →
-      </a>
-    </section>
   </main>
 
   <script>
-    const steps = [
-      {
-        id: "intent",
-        title: "What are you primarily looking for?",
-        subtitle: "This helps us guide you to the right area first.",
-        options: [
-          { value: "memorials", label: "Memorial highlights", desc: "Key places, plaques, and coordinates." },
-          { value: "stories", label: "Personal testimonies", desc: "Narratives centered on individuals." },
-          { value: "teaching", label: "Teaching resources", desc: "Sets you can reuse for classes or workshops." }
-        ]
-      },
-      {
-        id: "time",
-        title: "How much time do you have right now?",
-        subtitle: "We’ll adjust depth accordingly.",
-        options: [
-          { value: "5", label: "About 5 minutes", desc: "Just show me key highlights." },
-          { value: "10", label: "10–15 minutes", desc: "A balanced experience." },
-          { value: "20", label: "20+ minutes", desc: "I’m ready to dive deep." }
-        ]
-      },
-      {
-        id: "tone",
-        title: "Which tone resonates with you today?",
-        subtitle: "We’ll tailor narratives to match.",
-        options: [
-          { value: "reflective", label: "Reflective", desc: "Quiet, contemplative storytelling." },
-          { value: "investigative", label: "Investigative", desc: "Connect documents, clues, and context." },
-          { value: "hopeful", label: "Hopeful", desc: "Resilience, rebuilding, and new beginnings." }
-        ]
-      }
-    ];
+    let steps = [];
 
     const quizProgress = document.getElementById("quizProgress");
     const questionLabel = document.getElementById("questionLabel");
@@ -259,7 +287,8 @@
     let currentStep = 0;
 
     function updateProgress() {
-      const progress = (currentStep / steps.length) * 100;
+      if (!steps.length) return;
+      const progress = ((currentStep + 1) / steps.length) * 100;
       quizProgress.style.width = `${progress}%`;
     }
 
@@ -268,8 +297,7 @@
       summaryCard.classList.remove("visible");
       optionsGrid.hidden = false;
       quizActions.hidden = false;
-
-      questionLabel.textContent = `Question ${currentStep + 1} of ${steps.length}`;
+      questionLabel.textContent = `${currentStep + 1} of ${steps.length}`;
       questionTitle.textContent = step.title;
       questionSubtitle.textContent = step.subtitle;
 
@@ -287,6 +315,7 @@
         .join("");
 
       btnBack.disabled = currentStep === 0;
+      btnBack.style.visibility = currentStep === 0 ? "hidden" : "visible";
       btnNext.textContent = currentStep === steps.length - 1 ? "Finish" : "Next";
       btnNext.disabled = !currentAnswer;
 
@@ -295,7 +324,7 @@
 
     function showSummary() {
       quizProgress.style.width = "100%";
-      questionLabel.textContent = "All set";
+      questionLabel.textContent = `${steps.length} of ${steps.length}`;
       questionTitle.textContent = "We’ll individualize your tour.";
       questionSubtitle.textContent = "You can change these choices anytime later.";
 
@@ -309,6 +338,7 @@
       summaryCard.classList.add("visible");
       optionsGrid.hidden = true;
       quizActions.hidden = true;
+      btnBack.style.visibility = "hidden";
     }
 
     optionsGrid.addEventListener("click", (event) => {
@@ -337,7 +367,17 @@
       }
     });
 
-    renderStep();
+    async function initQuiz() {
+      try {
+        const res = await fetch("/static/quiz-steps.json", { cache: "no-cache" });
+        steps = await res.json();
+        renderStep();
+      } catch (err) {
+        console.error("Failed to load quiz steps", err);
+      }
+    }
+
+    initQuiz();
   </script>
 </body>
 </html>
