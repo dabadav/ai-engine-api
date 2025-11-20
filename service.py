@@ -26,6 +26,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+### UI
+#########################
+
+@app.get("/demo", tags=["Health"], include_in_schema=False)
+def demo():
+    return FileResponse("static/index.html")
+
+@app.get("/demo/app", tags=["Health"], include_in_schema=False)
+def demo_app():
+    return FileResponse("static/index.html")
+
+@app.get("/demo/newQuiz", tags=["Health"], include_in_schema=False)
+def demo_quiz():
+    return FileResponse("static/newQuiz.html")
+
+
+@app.get("/demo/newQuiz/myResults", tags=["Health"], include_in_schema=False)
+def demo_quiz_results():
+    return FileResponse("static/newQuizResults.html")
+
 ### Routes
 #########################
 
@@ -37,19 +57,6 @@ def root():
         "message": "AI Engine Service is running."
     }
 
-# Optional: serve index at root
-@app.get("/demo", tags=["Health"], include_in_schema=False)
-def demo():
-    return FileResponse("static/index.html")
-
-@app.get("/demo/newQuiz", tags=["Health"], include_in_schema=False)
-def demo_quiz():
-    return FileResponse("static/newQuiz.html")
-
-
-@app.get("/demo/newQuiz/myResults", tags=["Health"], include_in_schema=False)
-def demo_quiz_results():
-    return FileResponse("static/newQuizResults.html")
 ### / Search
 searcher = GlobalSearch(collection_name=COLLECTION_NAME)
 
@@ -104,12 +111,6 @@ async def read_user_search(
     # Rerank on engagement
     # Apply MMR for diversity
 
-## Search by current:
-#  - location, 
-#  - user,
-    #  - item,
-    #  - item history
-
 ### / Narrative
 class NarrativeRequest(BaseModel):
     items: List[dict]
@@ -151,7 +152,7 @@ async def read_item(item_id: List[int] = Query(..., example="2148")):
         "result": item,
     }
 
-
+### / DB
 @app.post("/db/users", tags=["Insert"])
 async def create_user(user: User):
     """

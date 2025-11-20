@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MEMORISE · Start</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top, #ffffff, #f5f5f5 50%),
+        radial-gradient(circle at bottom, #f0f0f0, #f5f5f5 60%);
+    }
+  </style>
+</head>
+<body>
+  <div class="intent-overlay">
+    <div class="intent-panel">
+      <h2>Hi there! What brings you here today?</h2>
+      <p>Choose the experience that best fits your current goal to jump right in.</p>
+      <div class="intent-options">
+        <a class="intent-card intent-link" href="/demo/app" data-mode="results">
+          <span class="intent-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="7"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </span>
+          <span>
+            <span class="intent-title">Search</span>
+            <span class="intent-desc">Look up specific people, places, or stories.</span>
+          </span>
+        </a>
+        <a class="intent-card intent-link" href="/demo/newQuiz">
+          <span class="intent-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+              <path d="M3 11h18v2H3z"></path>
+              <path d="M7 7h10v2H7zM9 15h6v2H9z"></path>
+            </svg>
+          </span>
+          <span>
+            <span class="intent-title">Explore</span>
+            <span class="intent-desc">Browse memorials on the map and discover narratives.</span>
+          </span>
+        </a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

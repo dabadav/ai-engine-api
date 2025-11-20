@@ -1034,3 +1034,219 @@ window.addEventListener('beforeunload', () => {
 });
 
 hideItemDetailUI();
+
+// ---------- Exploration mode: 2D topic space -----------------------------
+
+const exploreSvg = document.getElementById("exploreScatter");
+const exploreInfo = document.getElementById("exploreInfo");
+const hoverCard = document.getElementById("exploreHoverCard");
+const hoverTitle = document.getElementById("hoverTitle");
+const hoverMeta = document.getElementById("hoverMeta");
+const topicFilter = document.getElementById("topicFilter");
+
+let explorePoints = [];
+let exploreViewBox = { x: 0, y: 0, width: 100, height: 100 };
+let exploreRootGroup;
+
+// Utility: load JSONL file
+async function loadJsonl(url) {
+  const resp = await fetch(url);
+  const text = await resp.text();
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  return lines.map((l) => JSON.parse(l));
+}
+
+// Initialization
+async function initExploreSpace() {
+  if (!exploreSvg) return;
+
+  try {
+    exploreInfo.textContent = "Loading topic map…";
+
+    const items = await loadJsonl("/static/data/topics.jsonl");
+    explorePoints = items;
+
+    if (!items.length) {
+      exploreInfo.textContent = "No points available.";
+      return;
+    }
+
+    // Build topic list based on label (cluster id)
+    const labels = [...new Set(items.map((d) => d.label))].sort();
+    for (const lbl of labels) {
+      const opt = document.createElement("option");
+      opt.value = String(lbl);
+      opt.textContent = lbl;
+      topicFilter.appendChild(opt);
+    }
+
+
+    // Determine bounds from x,y
+    const xs = items.map((d) => d.x);
+    const ys = items.map((d) => d.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    const padding = 1; // your coords are already close, 1 is enough
+    exploreViewBox.x = minX - padding;
+    exploreViewBox.y = minY - padding;
+    exploreViewBox.width = (maxX - minX) + 2 * padding;
+    exploreViewBox.height = (maxY - minY) + 2 * padding;
+
+    exploreSvg.setAttribute(
+      "viewBox",
+      `${exploreViewBox.x} ${exploreViewBox.y} ${exploreViewBox.width} ${exploreViewBox.height}`
+    );
+
+    // Root group for pan/zoom
+    exploreRootGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    exploreSvg.appendChild(exploreRootGroup);
+
+    drawExplorePoints();
+
+    setupExploreInteractions();
+
+    exploreInfo.textContent = `Loaded ${items.length} items across ${labels.length} clusters.`;
+  } catch (err) {
+    console.error("Error loading explore space:", err);
+    exploreInfo.textContent = "Error loading topic map.";
+  }
+}
+
+// Draw points according to topic filter
+function drawExplorePoints() {
+  if (!exploreRootGroup) return;
+  exploreRootGroup.innerHTML = "";
+
+  const filterValue = topicFilter.value;
+  const filtered =
+    filterValue === "all"
+      ? explorePoints
+      : explorePoints.filter((p) => String(p.label) === filterValue);
+
+  const topicColors = {};
+  const colorPalette = [
+    "#E67702", "#4C6EF5", "#12B886", "#F03E3E",
+    "#7048E8", "#099268", "#D6336C", "#228BE6",
+  ];
+
+  function getLabelColor(label) {
+    const key = String(label);
+    if (!topicColors[key]) {
+      const idx = Object.keys(topicColors).length % colorPalette.length;
+      topicColors[key] = colorPalette[idx];
+    }
+    return topicColors[key];
+  }
+
+  for (const p of filtered) {
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", p.x);
+    circle.setAttribute("cy", p.y);
+    circle.setAttribute("r", 0.15); // small because your coords are tight
+    circle.setAttribute("fill", getLabelColor(p.label));
+    circle.setAttribute("fill-opacity", "0.9");
+    circle.setAttribute("data-id", p.id);
+    circle.setAttribute("data-label", p.label);
+    circle.setAttribute("data-topic", p.topic);
+
+    const title = p.text?.slice(0, 80) + (p.text && p.text.length > 80 ? "…" : "");
+    const topicName = p.topic?.replace(/\*\*/g, "") || "";
+
+    // Hover
+    circle.addEventListener("mouseenter", () => {
+      hoverTitle.textContent = title || `Item ${p.id}`;
+      hoverMeta.textContent = `${topicName} · ${p.label}`;
+      hoverCard.hidden = false;
+    });
+    circle.addEventListener("mouseleave", () => {
+      hoverCard.hidden = true;
+    });
+
+    // Click – hook into your detail logic here
+    circle.addEventListener("click", () => {
+      console.log("Clicked point", p);
+      // Example future hook:
+      // openItemDetailById(p.id);
+      // or call your /debug/item_info?item_id=... endpoint
+    });
+
+    exploreRootGroup.appendChild(circle);
+  }
+}
+
+// Basic pan/zoom for SVG
+function setupExploreInteractions() {
+  let isPanning = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  exploreSvg.addEventListener("mousedown", (e) => {
+    isPanning = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+
+  window.addEventListener("mouseup", () => {
+    isPanning = false;
+  });
+
+  exploreSvg.addEventListener("mousemove", (e) => {
+    if (!isPanning) return;
+
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+
+    const svgRect = exploreSvg.getBoundingClientRect();
+    const scaleX = exploreViewBox.width / svgRect.width;
+    const scaleY = exploreViewBox.height / svgRect.height;
+
+    exploreViewBox.x -= dx * scaleX;
+    exploreViewBox.y -= dy * scaleY;
+
+    exploreSvg.setAttribute(
+      "viewBox",
+      `${exploreViewBox.x} ${exploreViewBox.y} ${exploreViewBox.width} ${exploreViewBox.height}`
+    );
+  });
+
+  exploreSvg.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const zoomFactor = 1.1;
+    const direction = e.deltaY > 0 ? 1 : -1;
+    const factor = direction > 0 ? zoomFactor : 1 / zoomFactor;
+
+    const svgRect = exploreSvg.getBoundingClientRect();
+    const mouseX = e.clientX - svgRect.left;
+    const mouseY = e.clientY - svgRect.top;
+
+    const vx = exploreViewBox.x + (mouseX / svgRect.width) * exploreViewBox.width;
+    const vy = exploreViewBox.y + (mouseY / svgRect.height) * exploreViewBox.height;
+
+    exploreViewBox.width *= factor;
+    exploreViewBox.height *= factor;
+    exploreViewBox.x = vx - (mouseX / svgRect.width) * exploreViewBox.width;
+    exploreViewBox.y = vy - (mouseY / svgRect.height) * exploreViewBox.height;
+
+    exploreSvg.setAttribute(
+      "viewBox",
+      `${exploreViewBox.x} ${exploreViewBox.y} ${exploreViewBox.width} ${exploreViewBox.height}`
+    );
+  });
+
+  topicFilter.addEventListener("change", () => {
+    drawExplorePoints();
+  });
+}
+
+// Call this once on page load (after DOM ready)
+document.addEventListener("DOMContentLoaded", () => {
+  initExploreSpace();
+});

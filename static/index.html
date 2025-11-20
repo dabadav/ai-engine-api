@@ -70,12 +70,37 @@
             <div class="section-title">Results</div>
             <div class="results-count" id="resultsCount">No results yet</div>
           </div>
+
+          <!-- 2D exploration scatter -->
+          <section id="mode-explore" class="mode active">
+            <div class="explore-toolbar">
+              <span class="explore-info" id="exploreInfo">
+                Loading topic map…
+              </span>
+              <select id="topicFilter" class="explore-select">
+                <option value="all">All topics</option>
+              </select>
+            </div>
+            <div class="explore-canvas-wrapper">
+              <svg id="exploreScatter" class="explore-scatter"></svg>
+            </div>
+            <div class="explore-hover-card" id="exploreHoverCard" hidden>
+              <div class="hover-title" id="hoverTitle"></div>
+              <div class="hover-meta" id="hoverMeta"></div>
+            </div>
+          </section>
+
+          <!-- You can keep your Results / Narrative tabs below if you like -->
+          <!-- ... existing Results + Narrative sections ... -->
+        <!-- </div> -->
+
           <div class="results-list" id="resultsList">
             <div class="empty-state">
               Run a text search or geo search to see items here.
               We’ll show image, title, creator, and public link.
             </div>
           </div>
+
         </div>
 
         <div class="card">
