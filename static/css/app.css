@@ -1152,3 +1152,13 @@ input[type="range"] {
     max-height: 320px;
   }
 }
+.app-title-link,
+.quiz-brad {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-title-link:hover,
+.quiz-brand:hover {
+  opacity: 0.8;
+}

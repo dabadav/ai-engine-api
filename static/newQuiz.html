@@ -61,13 +61,28 @@
     }
 
     .quiz-header {
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
 
     .quiz-header h1 {
       margin: 8px 0 4px;
       font-size: 1.8rem;
       font-weight: 600;
+      text-align: center;
+    }
+
+    .quiz-brand {
+      text-decoration: none;
+      color: inherit;
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .progress-count {
@@ -256,7 +271,6 @@
     <div class="content-panel">
       <div class="quiz-header">
         <h1 id="questionTitle"></h1>
-        <!-- <p class="quiz-note">We ask a few quick questions to individualize your exploration. Nothing is stored or shared.</p> -->
       </div>
 
       <section class="options-grid" id="optionsGrid"></section>
