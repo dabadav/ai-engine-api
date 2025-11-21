@@ -13,9 +13,10 @@ RUN pip install poetry
 # Copy and install Python deps
 COPY pyproject.toml poetry.lock* ./
 
-# Copy the source code (both api and ai_engine)
+# Install dependencies and copy the source code
 RUN poetry install --no-root --only main
+COPY . .
 
 # Expose & run API (adapt to your actual app)
 EXPOSE 8000
-CMD ["poetry", "run", "uvicorn", "ai_engine_api.service:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["poetry", "run", "uvicorn", "service:app", "--host", "0.0.0.0", "--port", "8000"]
