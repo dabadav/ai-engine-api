@@ -9,8 +9,8 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
 dependencies = [
-    "fastapi (>=0.121.3,<0.122.0)",
     "ai-engine @ git+https://github.com/dabadav/ai-engine.git",
+    "fastapi (>=0.121.3,<0.122.0)",
     "uvicorn (>=0.38.0,<0.39.0)"
 ]
 
