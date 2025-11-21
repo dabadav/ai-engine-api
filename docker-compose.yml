@@ -1,0 +1,36 @@
+services:
+
+  api:
+    build: .
+    container_name: ai_engine_api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://ai_engine:ai_engine_pw@db:5432/ai_events
+    ports:
+      - "8000:8000"
+    # Assuming your Dockerfile CMD is:
+    # CMD ["uvicorn", "ai_engine_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    container_name: ai_engine_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ai_events
+      POSTGRES_USER: ai_engine
+      POSTGRES_PASSWORD: ai_engine_pw
+    ports:
+      - "5432:5432"               # so you can connect with psql locally
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_engine -d ai_events"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data:
