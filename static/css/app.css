@@ -473,6 +473,19 @@ input[type="text"]:focus {
   flex: 1;
 }
 
+.app-shell .input-row input {
+  align-items: center;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: #ffffff;
+  transition: border-color 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+.app-shell .input-row input:focus {
+  box-shadow: none;
+}
+
 .btn {
   border-radius: 10px;
   border: 1px solid var(--border-strong);
@@ -827,6 +840,8 @@ input[type="range"] {
 
 .result-thumb {
   width: 100%;
+  max-width: 100%;
+  display: block;
   aspect-ratio: 4 / 3;
   border-radius: 10px;
   object-fit: cover;

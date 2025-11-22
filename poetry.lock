@@ -25,7 +25,7 @@ sqlalchemy = ">=2.0.44,<3.0.0"
 type = "git"
 url = "https://github.com/dabadav/ai-engine.git"
 reference = "HEAD"
-resolved_reference = "d36148d407b7dd3b793c89b99b6972446bb176a5"
+resolved_reference = "50c8e3b34f1ef741ef5d6c4a9cbc49db372dd8b9"
 
 [[package]]
 name = "annotated-doc"
