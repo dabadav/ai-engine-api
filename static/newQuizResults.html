@@ -178,6 +178,123 @@
         transform: translateX(100%);
       }
     }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.35);
+      backdrop-filter: blur(10px);
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      padding: 20px;
+      z-index: 20;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease;
+    }
+
+    .overlay.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .email-card {
+      width: min(520px, 100%);
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      padding: 18px 18px 16px;
+      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      display: grid;
+      gap: 12px;
+      transform: translateY(20px);
+      animation: slideUp 0.45s ease forwards;
+    }
+
+    .app-preview {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      z-index: 0;
+      display: none;
+    }
+
+    .app-preview.visible {
+      display: block;
+    }
+
+    .email-card h2 {
+      margin: 0;
+      font-size: 1.1rem;
+      color: #0f172a;
+    }
+
+    .email-card p {
+      margin: 0;
+      font-size: 0.95rem;
+      color: #475569;
+    }
+
+    .email-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .email-form input {
+      padding: 12px 14px;
+      font-size: 1rem;
+      border-radius: 12px;
+      border: 1px solid rgba(15, 23, 42, 0.15);
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    .email-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-start;
+    }
+
+    .email-form button {
+      padding: 12px 16px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #fcd34d, #f97316);
+      color: #0f172a;
+      font-weight: 700;
+      cursor: pointer;
+      min-width: 120px;
+      box-shadow: 0 12px 30px rgba(249, 115, 22, 0.35);
+    }
+
+    .email-form button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-ghost {
+      background: #e2e8f0;
+      color: #0f172a;
+      box-shadow: none;
+    }
+
+    .email-error {
+      color: #b91c1c;
+      font-size: 0.9rem;
+      min-height: 18px;
+    }
+
+    @keyframes slideUp {
+      to {
+        transform: translateY(0);
+      }
+    }
   </style>
 </head>
 <body>
@@ -187,7 +304,29 @@
     <p>We curated the experience based on your quiz answers. Take a look while we prepare the map.</p>
     <div class="status">Individualizing results…</div>
     <div class="results" id="resultsList"></div>
-    <!-- <div class="timer" id="timer">Redirecting in 6 seconds</div> -->
+  </div>
+
+  <iframe
+    id="appPreview"
+    class="app-preview"
+    title="MEMORISE app preview"
+    loading="lazy"
+    aria-hidden="true"
+  ></iframe>
+
+  <div class="overlay" id="emailOverlay" aria-hidden="true">
+    <div class="email-card">
+      <h2>Send my tailored walkthrough</h2>
+      <p>Share your email to receive the personalized MEMORISE map and continue to the app.</p>
+      <form class="email-form" id="emailForm">
+        <input type="email" id="emailInput" name="email" placeholder="you@example.com" autocomplete="email" required />
+        <div class="email-actions">
+          <button type="submit" id="emailSubmit">Continue</button>
+          <button type="button" class="btn-ghost" id="emailSkip">Continue without email</button>
+        </div>
+      </form>
+      <div class="email-error" id="emailError"></div>
+    </div>
   </div>
 
   <script>
@@ -236,28 +375,90 @@
             placeholders[index].replaceWith(card);
           }, index * 350);
         });
+
+        // Wait for the final card to animate in before resolving
+        const totalDelay = Math.max(steps.length - 1, 0) * 350 + 500;
+        await new Promise((resolve) => setTimeout(resolve, totalDelay));
+        return totalDelay;
       } catch (err) {
         console.error("Failed to load quiz steps", err);
         listEl.innerHTML = "<p>We’ll take you to the map in a moment.</p>";
       }
     }
 
-    function startTimer() {
-      const timerEl = document.getElementById("timer");
-      let remaining = 5;
-      const interval = setInterval(() => {
-        remaining -= 1;
-        if (remaining <= 0) {
-          clearInterval(interval);
-          window.location.href = "/demo/app";
-          return;
+    function showEmailOverlay() {
+      const overlay = document.getElementById("emailOverlay");
+      if (!overlay || overlay.classList.contains("visible")) return;
+      overlay.classList.add("visible");
+      overlay.setAttribute("aria-hidden", "false");
+      const preview = document.getElementById("appPreview");
+      if (preview) {
+        if (!preview.src) {
+          preview.src = "/demo/app";
         }
-        // timerEl.textContent = `Redirecting in ${remaining} seconds`;
-      }, 1000);
+        preview.classList.add("visible");
+      }
+      const input = document.getElementById("emailInput");
+      if (input) {
+        setTimeout(() => input.focus(), 50);
+      }
     }
 
-    renderResults();
-    startTimer();
+    function wireEmailForm() {
+      const form = document.getElementById("emailForm");
+      const input = document.getElementById("emailInput");
+      const errorEl = document.getElementById("emailError");
+      const submitBtn = document.getElementById("emailSubmit");
+      const skipBtn = document.getElementById("emailSkip");
+      if (!form || !input || !submitBtn || !skipBtn) return;
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const email = input.value.trim();
+        if (!email) {
+          errorEl.textContent = "Please enter your email.";
+          return;
+        }
+        if (!input.checkValidity()) {
+          errorEl.textContent = "That doesn’t look like a valid email.";
+          return;
+        }
+        errorEl.textContent = "";
+        submitBtn.disabled = true;
+        try {
+          localStorage.setItem("quizEmail", email);
+        } catch (err) {
+          console.warn("Unable to persist email", err);
+        }
+        window.location.href = "/demo/app";
+      });
+
+      skipBtn.addEventListener("click", () => {
+        submitBtn.disabled = true;
+        skipBtn.disabled = true;
+        try {
+          localStorage.setItem("quizEmail", "declined");
+        } catch (err) {
+          console.warn("Unable to persist decline", err);
+        }
+        window.location.href = "/demo/app";
+      });
+
+      input.addEventListener("input", () => {
+        errorEl.textContent = "";
+      });
+    }
+
+    wireEmailForm();
+    renderResults()
+      .catch(() => null)
+      .then((delayMs) => {
+        const extraBuffer = 1500;
+        const waitMs = (Number(delayMs) || 0) + extraBuffer;
+        setTimeout(showEmailOverlay, waitMs);
+      });
+    // Fallback: ensure overlay appears even if rendering never resolves
+    setTimeout(showEmailOverlay, 10000);
   </script>
 </body>
 </html>
