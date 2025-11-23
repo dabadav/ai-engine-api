@@ -1233,6 +1233,10 @@ let exploreHoverFrame = null;
 let explorePendingEvent = null;
 let exploreLastResultsKey = "";
 let exploreLabelNodes = [];
+// Keep default aspect ratio handling for accurate pointer mapping
+if (exploreSvg) {
+  exploreSvg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+}
 
 // ---------- Helpers for client-side coordinates ----------------------------
 
@@ -1367,16 +1371,17 @@ function updateExploreLabelAppearance() {
 }
 
 function svgPointFromClient(event) {
-  if (!exploreSvg) return null;
-  const svgRect = exploreSvg.getBoundingClientRect();
-  const withinX = event.clientX >= svgRect.left && event.clientX <= svgRect.right;
-  const withinY = event.clientY >= svgRect.top && event.clientY <= svgRect.bottom;
-  if (!withinX || !withinY) return null;
-  const px = (event.clientX - svgRect.left) / svgRect.width;
-  const py = (event.clientY - svgRect.top) / svgRect.height;
+  if (!exploreSvg || !exploreSvg.createSVGPoint) return null;
+  const pt = exploreSvg.createSVGPoint();
+  pt.x = event.clientX;
+  pt.y = event.clientY;
+  const ctm = exploreSvg.getScreenCTM();
+  if (!ctm) return null;
+  const inv = ctm.inverse();
+  const svgPt = pt.matrixTransform(inv);
   return {
-    x: exploreViewBox.x + px * exploreViewBox.width,
-    y: exploreViewBox.y + py * exploreViewBox.height,
+    x: svgPt.x,
+    y: svgPt.y,
   };
 }
 
@@ -1470,6 +1475,20 @@ function lightenColor(hex, amount = 0.2) {
     : [120, 120, 120];
   const t = Math.max(0, Math.min(1, amount));
   const mix = rgb.map((c) => Math.round(c + (255 - c) * t));
+  return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
+}
+
+function darkenColor(hex, amount = 0.2) {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || "");
+  const rgb = m
+    ? [
+        parseInt(m[1].slice(0, 2), 16),
+        parseInt(m[1].slice(2, 4), 16),
+        parseInt(m[1].slice(4, 6), 16),
+      ]
+    : [80, 80, 80];
+  const t = Math.max(0, Math.min(1, amount));
+  const mix = rgb.map((c) => Math.round(c * (1 - t)));
   return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
 }
 
@@ -1667,12 +1686,13 @@ async function initExploreSpace() {
       return;
     }
 
-    // Build topic list based on label (cluster id)
-    const labels = [...new Set(items.map((d) => d.label))].sort();
-    for (const lbl of labels) {
+    // Build topic list based on topic text (fallback to label)
+    const labelSet = new Set(items.map((d) => d.label));
+    const topics = [...new Set(items.map((d) => d.topic || d.label || ""))].sort();
+    for (const topic of topics) {
       const opt = document.createElement("option");
-      opt.value = String(lbl);
-      opt.textContent = lbl;
+      opt.value = String(topic);
+      opt.textContent = topic;
       topicFilter.appendChild(opt);
     }
 
@@ -1712,7 +1732,7 @@ async function initExploreSpace() {
 
     setupExploreInteractions();
 
-    exploreInfo.textContent = `Loaded ${items.length} items across ${labels.length} clusters. Hover or click to surface neighbors.`;
+    exploreInfo.textContent = `Loaded ${items.length} items across ${topics.length} clusters. Hover or click to surface neighbors.`;
   } catch (err) {
     console.error("Error loading explore space:", err);
     exploreInfo.textContent = "Error loading topic map.";
@@ -1740,7 +1760,7 @@ function drawExplorePoints() {
   const filtered =
     filterValue === "all"
       ? explorePoints
-      : explorePoints.filter((p) => String(p.label) === filterValue);
+      : explorePoints.filter((p) => String(p.topic || p.label) === filterValue);
   exploreVisiblePoints = filtered;
 
   const topicColors = {};
@@ -1895,10 +1915,13 @@ function drawExplorePoints() {
     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
     text.setAttribute("x", placedX);
     text.setAttribute("y", placedY);
-    text.setAttribute("fill", info.color || "#111827");
+    const labelColor = darkenColor(info.color, 0.35);
+    text.setAttribute("fill", labelColor || "#111827");
     text.setAttribute("font-size", fontSize);
     text.setAttribute("text-anchor", "middle");
     text.setAttribute("dominant-baseline", "middle");
+    text.setAttribute("font-weight", "600");
+    text.setAttribute("letter-spacing", "-0.02em");
     text.setAttribute("pointer-events", "none");
     text.classList.add("explore-label");
     text.textContent = textStr;
