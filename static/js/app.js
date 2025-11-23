@@ -1217,184 +1217,153 @@ const hoverCard = document.getElementById("exploreHoverCard");
 const hoverTitle = document.getElementById("hoverTitle");
 const hoverMeta = document.getElementById("hoverMeta");
 const topicFilter = document.getElementById("topicFilter");
+const qdrantCache = new Map();
+let exploreResultsSeq = 0;
 
 let explorePoints = [];
 let exploreVisiblePoints = [];
 let exploreViewBox = { x: 0, y: 0, width: 100, height: 100 };
+let exploreBaseSpan = 1;
 let exploreRootGroup;
+let exploreBlobGroup;
 let explorePointRadius = 0.02;
 const explorePointElements = new Map();
 let exploreIsPanning = false;
 let exploreHoverFrame = null;
 let explorePendingEvent = null;
 let exploreLastResultsKey = "";
+let exploreLabelNodes = [];
 
-// ---------- Helpers for client-side projection ----------------------------
-
-function dotProduct(a, b) {
-  let sum = 0;
-  const len = Math.min(a.length, b.length);
-  for (let i = 0; i < len; i++) {
-    sum += a[i] * b[i];
-  }
-  return sum;
-}
-
-function normalizeVector(vec) {
-  let normSq = 0;
-  for (let i = 0; i < vec.length; i++) {
-    normSq += vec[i] * vec[i];
-  }
-  const norm = Math.sqrt(normSq);
-  if (!isFinite(norm) || norm === 0) {
-    return 0;
-  }
-  for (let i = 0; i < vec.length; i++) {
-    vec[i] /= norm;
-  }
-  return norm;
-}
-
-function randomUnitVector(dim) {
-  const arr = new Array(dim);
-  for (let i = 0; i < dim; i++) {
-    arr[i] = Math.random() - 0.5;
-  }
-  if (normalizeVector(arr) === 0) {
-    for (let i = 0; i < dim; i++) {
-      arr[i] = 0;
-    }
-    arr[0] = 1;
-  }
-  return arr;
-}
-
-function computePrincipalComponents(data, count) {
-  if (!data.length) return [];
-  const dim = data[0].length;
-  const components = [];
-  const maxIter = 50;
-  for (let c = 0; c < count; c++) {
-    let vec = randomUnitVector(dim);
-    let converged = false;
-    let validComponent = false;
-
-    for (let iter = 0; iter < maxIter; iter++) {
-      const next = new Array(dim).fill(0);
-      for (const sample of data) {
-        const dot = dotProduct(sample, vec);
-        for (let i = 0; i < dim; i++) {
-          next[i] += dot * sample[i];
-        }
-      }
-
-      for (const basis of components) {
-        const proj = dotProduct(next, basis);
-        for (let i = 0; i < dim; i++) {
-          next[i] -= proj * basis[i];
-        }
-      }
-
-      if (!normalizeVector(next)) {
-        break;
-      }
-      validComponent = true;
-
-      let diff = 0;
-      for (let i = 0; i < dim; i++) {
-        const delta = next[i] - vec[i];
-        diff += delta * delta;
-      }
-      vec = next;
-
-      if (diff < 1e-6) {
-        converged = true;
-        break;
-      }
-    }
-
-    if (!validComponent) break;
-
-    components.push(vec.slice());
-  }
-  return components;
-}
-
-function projectVectorsTo2D(vectors) {
-  if (!vectors.length) return null;
-  const dim = vectors[0].length;
-  if (dim < 2) return null;
-
-  const mean = new Array(dim).fill(0);
-  for (const vec of vectors) {
-    for (let i = 0; i < dim; i++) {
-      mean[i] += vec[i];
-    }
-  }
-  for (let i = 0; i < dim; i++) {
-    mean[i] /= vectors.length;
-  }
-
-  const centered = vectors.map((vec) => {
-    const row = new Array(dim);
-    for (let i = 0; i < dim; i++) {
-      row[i] = vec[i] - mean[i];
-    }
-    return row;
-  });
-
-  const components = computePrincipalComponents(centered, 2);
-  if (components.length < 2) {
-    return null;
-  }
-
-  return centered.map((sample) => [
-    dotProduct(sample, components[0]),
-    dotProduct(sample, components[1]),
-  ]);
-}
+// ---------- Helpers for client-side coordinates ----------------------------
 
 function ensureExploreCoordinates(items) {
-  const needsProjection = items.some(
-    (item) => typeof item.x !== "number" || typeof item.y !== "number"
-  );
-  if (!needsProjection) return;
-
-  const vectors = [];
-  const indexMap = [];
-  for (let i = 0; i < items.length; i++) {
-    const vec = items[i].vector;
-    if (Array.isArray(vec) && vec.length >= 2) {
-      vectors.push(vec);
-      indexMap.push(i);
-    }
-  }
-
-  if (!vectors.length) {
-    console.warn("Topic map: no vectors available for projection.");
-    return;
-  }
-
-  let coords = projectVectorsTo2D(vectors);
-  if (!coords) {
-    console.warn("Topic map: PCA projection failed, falling back to first two dimensions.");
-    coords = vectors.map((vec) => [vec[0] || 0, vec[1] || 0]);
-  }
-
-  indexMap.forEach((itemIdx, coordIdx) => {
-    const [x, y] = coords[coordIdx];
-    items[itemIdx].x = x;
-    items[itemIdx].y = y;
-  });
-
   let fallbackCounter = 0;
   for (const item of items) {
-    if (typeof item.x !== "number" || typeof item.y !== "number") {
-      item.x = fallbackCounter * 0.1;
-      item.y = 0;
-      fallbackCounter += 1;
+    const x = Number(item.x);
+    const y = Number(item.y);
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      item.x = x;
+      item.y = y;
+      continue;
     }
+
+    const vec = Array.isArray(item.vector) ? item.vector : null;
+    if (vec && vec.length >= 2) {
+      const vx = Number(vec[0]);
+      const vy = Number(vec[1]);
+      item.x = Number.isFinite(vx) ? vx : 0;
+      item.y = Number.isFinite(vy) ? vy : 0;
+      continue;
+    }
+
+    item.x = fallbackCounter * 0.1;
+    item.y = 0;
+    fallbackCounter += 1;
   }
+
+  // If all points are effectively on a line (x ~= y), add small deterministic jitter
+  // so the plot remains readable until true 2D coordinates are available.
+  const coords = items
+    .map((d) => [d.x, d.y])
+    .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
+  if (!coords.length) return;
+
+  const meanX = coords.reduce((s, [a]) => s + a, 0) / coords.length;
+  const meanY = coords.reduce((s, [, b]) => s + b, 0) / coords.length;
+  const cov =
+    coords.reduce((s, [a, b]) => s + (a - meanX) * (b - meanY), 0) /
+    coords.length;
+  const varX =
+    coords.reduce((s, [a]) => s + (a - meanX) * (a - meanX), 0) /
+    coords.length;
+  const varY =
+    coords.reduce((s, [, b]) => s + (b - meanY) * (b - meanY), 0) /
+    coords.length;
+  const corr =
+    varX > 0 && varY > 0 ? cov / Math.sqrt(varX * varY) : 0;
+
+  if (Math.abs(corr) <= 0.995) return;
+
+  const labels = Array.from(
+    new Set(items.map((d) => (d.label !== undefined ? String(d.label) : "unknown")))
+  ).sort();
+
+  const labelAngles = new Map();
+  labels.forEach((lbl, idx) => {
+    labelAngles.set(lbl, (idx / labels.length) * Math.PI * 2);
+  });
+
+  const xs = coords.map(([a]) => a);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const span = Math.max(maxX - minX, 1e-6);
+
+  function hashToUnit(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+      h = (h * 31 + str.charCodeAt(i) + 7) >>> 0;
+    }
+    return (h % 10000) / 10000;
+  }
+
+  items.forEach((item, idx) => {
+    const labelKey = item.label !== undefined ? String(item.label) : "unknown";
+    const angleBase = labelAngles.get(labelKey) ?? 0;
+    const key =
+      item.id !== undefined
+        ? String(item.id)
+        : item.label !== undefined
+          ? String(item.label)
+          : String(idx);
+
+    const thetaJitter = (hashToUnit(key + "theta") - 0.5) * (Math.PI / labels.length);
+    const radialJitter = (hashToUnit(key + "radial") - 0.5) * 0.3;
+    const baseRadius = 1 + (Number(item.x) - minX) / span;
+    const r = baseRadius + radialJitter;
+    const theta = angleBase + thetaJitter;
+
+    item.x = r * Math.cos(theta);
+    item.y = r * Math.sin(theta);
+  });
+
+  console.warn("Topic map: colinear coordinates detected; redistributed points radially by label.");
+}
+
+function ensureExploreDefs() {
+  if (!exploreSvg) return;
+  let defs = exploreSvg.querySelector("defs");
+  if (!defs) {
+    defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    exploreSvg.insertBefore(defs, exploreSvg.firstChild);
+  }
+  if (!exploreSvg.querySelector("#exploreBlobBlur")) {
+    const filter = document.createElementNS("http://www.w3.org/2000/svg", "filter");
+    filter.setAttribute("id", "exploreBlobBlur");
+    filter.setAttribute("x", "-20%");
+    filter.setAttribute("y", "-20%");
+    filter.setAttribute("width", "140%");
+    filter.setAttribute("height", "140%");
+    const fe = document.createElementNS("http://www.w3.org/2000/svg", "feGaussianBlur");
+    fe.setAttribute("in", "SourceGraphic");
+    fe.setAttribute("stdDeviation", "0.18");
+    filter.appendChild(fe);
+    defs.appendChild(filter);
+  }
+}
+
+function updateExploreLabelAppearance() {
+  const span = Math.max(exploreViewBox.width, exploreViewBox.height, 1e-6);
+  const detail = exploreBaseSpan / span;
+  const scale = span / exploreBaseSpan;
+  exploreLabelNodes.forEach(({ node, count, baseFont }) => {
+    if (!node) return;
+    const score = (count || 1) * detail;
+    const visible = score >= 1.6;
+    node.style.display = visible ? "block" : "none";
+    node.style.opacity = visible ? "0.9" : "0";
+    const size = Math.max((baseFont || 0.16) * scale, 0.08);
+    node.setAttribute("font-size", size);
+  });
 }
 
 function svgPointFromClient(event) {
@@ -1435,6 +1404,75 @@ function findNeighborsAtPosition(x, y, options = {}) {
   return matches.slice(0, limit);
 }
 
+function computeCentroid(points) {
+  if (!points.length) return { x: 0, y: 0 };
+  const sum = points.reduce(
+    (acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }),
+    { x: 0, y: 0 }
+  );
+  return { x: sum.x / points.length, y: sum.y / points.length };
+}
+
+function computeHull(points) {
+  if (points.length <= 1) return points.slice();
+  const pts = points
+    .map((p) => ({ x: p.x, y: p.y }))
+    .sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
+
+  const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower = [];
+  for (const p of pts) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+  const upper = [];
+  for (let i = pts.length - 1; i >= 0; i--) {
+    const p = pts[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+  upper.pop();
+  lower.pop();
+  return lower.concat(upper);
+}
+
+function scalePolygon(points, factor) {
+  if (!points.length) return [];
+  const c = computeCentroid(points);
+  return points.map((p) => ({
+    x: c.x + (p.x - c.x) * factor,
+    y: c.y + (p.y - c.y) * factor,
+  }));
+}
+
+function polygonPath(points) {
+  if (!points.length) return "";
+  const cmds = [`M ${points[0].x} ${points[0].y}`];
+  for (let i = 1; i < points.length; i++) {
+    cmds.push(`L ${points[i].x} ${points[i].y}`);
+  }
+  cmds.push("Z");
+  return cmds.join(" ");
+}
+
+function lightenColor(hex, amount = 0.2) {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || "");
+  const rgb = m
+    ? [
+        parseInt(m[1].slice(0, 2), 16),
+        parseInt(m[1].slice(2, 4), 16),
+        parseInt(m[1].slice(4, 6), 16),
+      ]
+    : [120, 120, 120];
+  const t = Math.max(0, Math.min(1, amount));
+  const mix = rgb.map((c) => Math.round(c + (255 - c) * t));
+  return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
+}
+
 function highlightExploreNeighbors(neighbors) {
   const highlightMap = new Map();
   neighbors.forEach((entry, idx) => {
@@ -1459,38 +1497,103 @@ function highlightExploreNeighbors(neighbors) {
   });
 }
 
-function neighborToResult(neighbor) {
+async function fetchQdrantItems(itemIds = []) {
+  const ids = Array.from(
+    new Set(
+      itemIds
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id))
+    )
+  );
+
+  const missing = ids.filter((id) => !qdrantCache.has(String(id)));
+  if (missing.length) {
+    const params = new URLSearchParams();
+    missing.forEach((id) => params.append("item_id", id));
+    try {
+      const res = await fetch(`/debug/item_info?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        const result = data?.result;
+        if (result && typeof result === "object" && !Array.isArray(result)) {
+          Object.entries(result).forEach(([key, payload]) => {
+            qdrantCache.set(String(key), payload || {});
+          });
+        } else if (Array.isArray(result)) {
+          result.forEach((entry) => {
+            const key = entry?.id ?? entry?.point_id;
+            if (key !== undefined) {
+              qdrantCache.set(String(key), entry?.payload || entry || {});
+            }
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch Qdrant items", err);
+    }
+  }
+
+  const map = new Map();
+  ids.forEach((id) => {
+    const key = String(id);
+    if (qdrantCache.has(key)) {
+      map.set(key, qdrantCache.get(key));
+    }
+  });
+  return map;
+}
+
+function neighborToResult(neighbor, qdrantPayload) {
   const { point, distance } = neighbor;
   const snippet = (point.text || "").trim();
   const fallbackTitle = snippet
     ? snippet.slice(0, 80) + (snippet.length > 80 ? "…" : "")
     : `Document ${point.id}`;
-  const title = point.topic || fallbackTitle;
+  const payload = { ...(qdrantPayload || {}) };
+
+  if (!payload.title) payload.title = point.topic || fallbackTitle;
+  if (!payload.text) payload.text = snippet;
+  if (!payload.topic_label) payload.topic_label = point.label || "";
+  if (!payload.topic_name) payload.topic_name = point.topic || "";
+  payload.explore_distance = distance;
 
   return {
     id: point.id,
     score: Number.isFinite(distance) ? Number(distance.toFixed(3)) : undefined,
-    payload: {
-      title,
-      text: snippet,
-      topic_label: point.label || "",
-      topic_name: point.topic || "",
-      explore_distance: distance,
-    },
+    payload,
+    source: "Explore",
   };
 }
 
-function updateExploreResultsFromNeighbors(neighbors, trigger = "hover", { force = false } = {}) {
+async function updateExploreResultsFromNeighbors(neighbors, trigger = "hover", { force = false } = {}) {
   if (!neighbors.length) return;
   const key = neighbors.map((entry) => entry.point.id).join("|");
   if (!force && trigger === "hover" && key === exploreLastResultsKey) {
     return;
   }
   exploreLastResultsKey = key;
-  const mapped = neighbors.map(neighborToResult);
+  const requestId = ++exploreResultsSeq;
+  const ids = neighbors
+    .map((entry) => entry.point?.id)
+    .filter((id) => id !== undefined && id !== null);
+
+  exploreInfo.textContent =
+    trigger === "click"
+      ? `Loading ${neighbors.length} items from Qdrant…`
+      : `Loading preview from Qdrant…`;
+
+  const qdrantMap = await fetchQdrantItems(ids);
+  if (requestId !== exploreResultsSeq) {
+    return;
+  }
+
+  const mapped = neighbors.map((neighbor) => {
+    const idKey = String(neighbor.point.id);
+    return neighborToResult(neighbor, qdrantMap.get(idKey));
+  });
   renderResults(mapped, "Explore");
   const action = trigger === "click" ? "Pinned" : "Hovering";
-  exploreInfo.textContent = `${action} ${mapped.length} nearby document${mapped.length === 1 ? "" : "s"}.`;
+  exploreInfo.textContent = `${action} ${mapped.length} Qdrant item${mapped.length === 1 ? "" : "s"}.`;
 }
 
 function processExplorePointerEvent(event, trigger) {
@@ -1592,6 +1695,7 @@ async function initExploreSpace() {
     exploreViewBox.height = spanY + padding * 2;
 
     const baseSize = Math.max(exploreViewBox.width, exploreViewBox.height);
+    exploreBaseSpan = baseSize;
     explorePointRadius = Math.min(Math.max(baseSize * 0.006, 0.004), 0.02);
 
     exploreSvg.setAttribute(
@@ -1602,6 +1706,7 @@ async function initExploreSpace() {
     // Root group for pan/zoom
     exploreRootGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
     exploreSvg.appendChild(exploreRootGroup);
+    ensureExploreDefs();
 
     drawExplorePoints();
 
@@ -1619,7 +1724,17 @@ function drawExplorePoints() {
   if (!exploreRootGroup) return;
   exploreRootGroup.innerHTML = "";
   explorePointElements.clear();
+  exploreLabelNodes = [];
   highlightExploreNeighbors([]);
+  exploreBlobGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  exploreBlobGroup.setAttribute("class", "explore-blobs");
+  exploreBlobGroup.setAttribute("pointer-events", "none");
+
+  const pointsGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  pointsGroup.setAttribute("class", "explore-points");
+
+  const labelsGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  labelsGroup.setAttribute("class", "explore-labels");
 
   const filterValue = topicFilter.value;
   const filtered =
@@ -1642,6 +1757,9 @@ function drawExplorePoints() {
     }
     return topicColors[key];
   }
+
+  const centroids = new Map();
+  const pointsByLabel = new Map();
 
   for (const p of filtered) {
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -1679,8 +1797,123 @@ function drawExplorePoints() {
       // or call your /debug/item_info?item_id=... endpoint
     });
 
-    exploreRootGroup.appendChild(circle);
+    pointsGroup.appendChild(circle);
+
+    // accumulate centroid per label
+    const lbl = String(p.label);
+    const current =
+      centroids.get(lbl) ||
+      { sumX: 0, sumY: 0, count: 0, color: getLabelColor(lbl), topic: p.topic || "" };
+    current.sumX += Number(p.x) || 0;
+    current.sumY += Number(p.y) || 0;
+    current.count += 1;
+    if (!current.topic && p.topic) {
+      current.topic = p.topic;
+    }
+    centroids.set(lbl, current);
+    if (!pointsByLabel.has(lbl)) {
+      pointsByLabel.set(lbl, []);
+    }
+    pointsByLabel.get(lbl).push({ x: Number(p.x), y: Number(p.y) });
   }
+
+  // Cluster blob “mass” effect
+  pointsByLabel.forEach((pts, lbl) => {
+    if (!pts.length) return;
+    const hull = computeHull(pts);
+    const color = getLabelColor(lbl);
+    const light = lightenColor(color, 0.4);
+    const scales = [1.18, 1.1, 1.0];
+    const alphas = [0.08, 0.12, 0.18];
+
+    scales.forEach((factor, idx) => {
+      const poly = hull.length >= 3 ? scalePolygon(hull, factor) : scalePolygon(pts, factor);
+      const pathD = polygonPath(poly);
+      if (!pathD) return;
+      const blob = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      blob.setAttribute("d", pathD);
+      blob.setAttribute("fill", light);
+      blob.setAttribute("fill-opacity", alphas[idx] || 0.1);
+      blob.setAttribute("filter", "url(#exploreBlobBlur)");
+      blob.setAttribute("stroke", "none");
+      blob.setAttribute("pointer-events", "none");
+      exploreBlobGroup.appendChild(blob);
+    });
+  });
+
+  // Add label text at cluster centroids with simple collision avoidance
+  const labelsArr = Array.from(centroids.entries()).sort((a, b) =>
+    a[0].localeCompare(b[0])
+  );
+  const placedBoxes = [];
+
+  function makeBounds(cx, cy, textStr, fontSize) {
+    const halfW = (textStr.length * fontSize * 0.55) / 2;
+    const halfH = fontSize * 0.6;
+    return {
+      x1: cx - halfW,
+      x2: cx + halfW,
+      y1: cy - halfH,
+      y2: cy + halfH,
+    };
+  }
+
+  function overlaps(box, other) {
+    return !(
+      box.x2 < other.x1 ||
+      box.x1 > other.x2 ||
+      box.y2 < other.y1 ||
+      box.y1 > other.y2
+    );
+  }
+
+  labelsArr.forEach(([lbl, info]) => {
+    if (!info.count) return;
+    const baseX = info.sumX / info.count;
+    const baseY = info.sumY / info.count;
+    const fontSize = Math.max(explorePointRadius * 6, 0.16);
+    const textStr = info.topic || lbl;
+    const step = fontSize * 1.4;
+    const offsets = [0, step, -step, 2 * step, -2 * step, 3 * step, -3 * step];
+
+    let placedX = baseX;
+    let placedY = baseY;
+    let bounds = makeBounds(baseX, baseY, textStr, fontSize);
+
+    for (const dy of offsets) {
+      const candidate = makeBounds(baseX, baseY + dy, textStr, fontSize);
+      const hit = placedBoxes.some((box) => overlaps(candidate, box));
+      if (!hit) {
+        placedY = baseY + dy;
+        bounds = candidate;
+        break;
+      }
+    }
+
+    placedBoxes.push(bounds);
+
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", placedX);
+    text.setAttribute("y", placedY);
+    text.setAttribute("fill", info.color || "#111827");
+    text.setAttribute("font-size", fontSize);
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("dominant-baseline", "middle");
+    text.setAttribute("pointer-events", "none");
+    text.classList.add("explore-label");
+    text.textContent = textStr;
+    labelsGroup.appendChild(text);
+    if (text.style) {
+      text.style.userSelect = "none";
+    }
+    exploreLabelNodes.push({ node: text, count: info.count, baseFont: fontSize });
+  });
+
+  exploreRootGroup.appendChild(exploreBlobGroup);
+  exploreRootGroup.appendChild(pointsGroup);
+  exploreRootGroup.appendChild(labelsGroup);
+
+  updateExploreLabelAppearance();
 }
 
 // Basic pan/zoom for SVG
@@ -1720,6 +1953,7 @@ function setupExploreInteractions() {
       "viewBox",
       `${exploreViewBox.x} ${exploreViewBox.y} ${exploreViewBox.width} ${exploreViewBox.height}`
     );
+    updateExploreLabelAppearance();
   });
 
   exploreSvg.addEventListener("wheel", (e) => {
@@ -1744,6 +1978,7 @@ function setupExploreInteractions() {
       "viewBox",
       `${exploreViewBox.x} ${exploreViewBox.y} ${exploreViewBox.width} ${exploreViewBox.height}`
     );
+    updateExploreLabelAppearance();
   });
 
   topicFilter.addEventListener("change", () => {
@@ -1762,9 +1997,9 @@ function setupExploreInteractions() {
 }
 
 // Call this once on page load (after DOM ready)
-document.addEventListener("DOMContentLoaded", () => {
-  initExploreSpace();
-});
+  document.addEventListener("DOMContentLoaded", () => {
+    initExploreSpace();
+  });
 (function preloadIntentQuery() {
   const stored = sessionStorage.getItem('memoriseIntentQuery');
   if (!stored) return;
