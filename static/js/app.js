@@ -1611,6 +1611,7 @@ async function updateExploreResultsFromNeighbors(neighbors, trigger = "hover", {
     return neighborToResult(neighbor, qdrantMap.get(idKey));
   });
   renderResults(mapped, "Explore");
+  plotGeoResultMarkers(mapped, { adjustView: false });
   const action = trigger === "click" ? "Pinned" : "Hovering";
   exploreInfo.textContent = `${action} ${mapped.length} Qdrant item${mapped.length === 1 ? "" : "s"}.`;
 }
