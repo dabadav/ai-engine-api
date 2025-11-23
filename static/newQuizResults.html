@@ -353,6 +353,7 @@
           required
           pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
         />
+        <div class="email-error" id="emailError" aria-live="polite"></div>
         <button type="submit" id="emailSubmit">Continue</button>
         <button type="button" class="btn-ghost" id="emailSkip">Continue without email</button>
       </form>
@@ -502,20 +503,28 @@
       const skipBtn = document.getElementById("emailSkip");
       if (!form || !input || !submitBtn || !skipBtn) return;
 
+      const setError = (msg = "") => {
+        if (errorEl) {
+          errorEl.textContent = msg;
+        } else {
+          console.warn("Email error element missing");
+        }
+      };
+
       const basicEmailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const email = input.value.trim();
         if (!email) {
-          errorEl.textContent = "Please enter your email.";
+          setError("Please enter your email.");
           return;
         }
         if (!input.checkValidity() || !basicEmailPattern.test(email)) {
-          errorEl.textContent = "That doesn’t look like a valid email.";
+          setError("That doesn’t look like a valid email.");
           return;
         }
-        errorEl.textContent = "";
+        setError("");
         submitBtn.disabled = true;
         skipBtn.disabled = true;
         try {
@@ -525,7 +534,7 @@
         }
         const userId = await createUserRecord({ email, optedOut: false });
         if (!userId) {
-          errorEl.textContent = "We couldn't save your profile, continuing without it.";
+          setError("We couldn't save your profile, continuing without it.");
         }
         const dest = userId ? `/demo/app?user_id=${encodeURIComponent(userId)}` : "/demo/app";
         window.location.href = dest;
@@ -541,14 +550,14 @@
         }
         const userId = await createUserRecord({ email: null, optedOut: true });
         if (!userId) {
-          errorEl.textContent = "We couldn't save your profile, continuing without it.";
+          setError("We couldn't save your profile, continuing without it.");
         }
         const dest = userId ? `/demo/app?user_id=${encodeURIComponent(userId)}` : "/demo/app";
         window.location.href = dest;
       });
 
       input.addEventListener("input", () => {
-        errorEl.textContent = "";
+        setError("");
       });
     }
 

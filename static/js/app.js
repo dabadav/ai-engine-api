@@ -703,7 +703,7 @@ function hideItemDetailUI() {
 function showItemDetail(item) {
   const payload = item.payload || {};
   const title = payload.title || '(No title)';
-  const text = payload.text || 'No description provided.';
+  const text = payload.text || '';
   const creator = payload.creator || '';
   const imageUrl = payload.image_url || payload.imageUrl || '';
   const publicUrl = payload.public_url || payload.publicUrl || '';
