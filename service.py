@@ -74,7 +74,6 @@ def demo_app():
 def demo_quiz():
     return FileResponse("static/newQuiz.html")
 
-
 @app.get("/demo/newQuiz/myResults", tags=["Health"], include_in_schema=False)
 def demo_quiz_results():
     return FileResponse("static/newQuizResults.html")
@@ -100,7 +99,6 @@ async def read_item_search(q: str = Query(..., description="Search text", exampl
         "result": results
     }
 
-
 @app.get("/api/search/geo", tags=["Search"])
 async def read_geo_search(
     lat: float = Query(..., example=52.7579),
@@ -122,9 +120,8 @@ async def read_geo_search(
         "result": results.dict()
     }
 
-
-@app.get("/api/search/user", tags=["Search"])
-async def read_user_search(
+@app.get("/api/search/preference", tags=["Search"])
+async def read_event_search(
     user_id: int = Query(..., example=10),
     # lat: Optional[float] = Query(default=None, example=52.7579),
     # lon: Optional[float] = Query(default=None, example=9.9048),
@@ -135,6 +132,28 @@ async def read_user_search(
     """
     user_recommender = searcher.user_recommender
     results = user_recommender.recommend_for_user(user_id=user_id)
+    return {
+        "result": results.dict()
+    }
+    # Get user state / history
+    # Extract positive negative signals
+    # Query qdrant on semantic taste vector
+    # Rerank on engagement
+    # Apply MMR for diversity
+
+@app.get("/api/search/profile", tags=["Search"])
+async def read_user_search(
+    user_id: int = Query(..., example=10),
+    # lat: Optional[float] = Query(default=None, example=52.7579),
+    # lon: Optional[float] = Query(default=None, example=9.9048),
+    # radius_meters: float = Query(5000),
+):
+    """
+    Search by user history and optionally by location.
+    """
+    db_projection = ProjectionBuilder(collection_name=COLLECTION_NAME)
+    user_query = db_projection.get_user_profile_as_text(user_id = user_id)
+    results = searcher.search(text=user_query)
     return {
         "result": results.dict()
     }
@@ -167,7 +186,7 @@ async def read_user(user_id: int = Query(..., example=10)):
     user_data = db_client.fetch_user(user_id=int(user_id))
     user_history = db_client.fetch_events_raw(user_id=int(user_id))
     user_dwell = db_client.fetch_events(user_id=int(user_id))
-    user_metrics = db_projection.get_user_projection(user_id=str(user_id))
+    user_metrics = db_projection.get_user_projection(user_id=int(user_id))
     return {
         "result": {
             "user_data": user_data.to_dict(orient="records"),
@@ -186,7 +205,7 @@ async def read_item(item_id: List[int] = Query(..., example="2148")):
     }
 
 ### / DB
-@app.post("/db/guests", tags=["Insert"])
+@app.post("/db/guest", tags=["Insert"])
 async def create_guest():
     """
     Generates an unidentified session and user
@@ -195,7 +214,7 @@ async def create_guest():
         "status": "not implemented", 
     }
 
-@app.post("/db/users", tags=["Insert"])
+@app.post("/db/user", tags=["Insert"])
 async def create_user(user: User):
     """
     Inserts a user row via DB_Interface.register_user.

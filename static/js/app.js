@@ -1,5 +1,10 @@
 // --- Map + state --------------------------------------------------------
-const ACTIVE_USER_ID = 1110;
+let ACTIVE_USER_ID = 1110;
+const urlParams = new URLSearchParams(window.location.search);
+const urlUserId = Number(urlParams.get('user_id'));
+if (Number.isInteger(urlUserId) && urlUserId > 0) {
+  ACTIVE_USER_ID = urlUserId;
+}
 const ACTIVE_SESSION_ID = "3c048758-287c-49db-938b-240bc91cc4b8";
 
 const map = L.map('map'); // no setView yet, we'll do it after loading
@@ -914,6 +919,26 @@ function getNarrativeItemById(itemId) {
   return lastResultsById.get(key) || null;
 }
 
+async function loadProfileResults(userId) {
+  if (!Number.isInteger(userId) || userId <= 0) return;
+  resultsCount.textContent = 'Loading your profile results…';
+  try {
+    const params = new URLSearchParams({ user_id: userId });
+    const res = await fetch('/api/search/profile?' + params.toString());
+    const json = await res.json();
+    const items = normalizeResults(json);
+    await finalizeActiveInteraction();
+    hideItemDetailUI();
+    renderResults(items, 'Profile');
+    plotGeoResultMarkers(items, { adjustView: false });
+  } catch (err) {
+    console.error('Error loading profile results', err);
+    resultsList.innerHTML = '<div class="empty-state">Error loading profile results.</div>';
+    resultsCount.textContent = 'Error';
+    plotGeoResultMarkers([]);
+  }
+}
+
 function renderNarrativeResultCard(itemId) {
   const item = getNarrativeItemById(itemId);
   const payload = item?.payload || {};
@@ -1170,6 +1195,10 @@ window.addEventListener('beforeunload', () => {
   activeInteraction = null;
   sendInteractionEvent(itemId, 'end', { useBeacon: true });
 });
+
+if (Number.isInteger(urlUserId) && urlUserId > 0) {
+  loadProfileResults(urlUserId);
+}
 
 hideItemDetailUI();
 

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS visitor (
   password_hash       TEXT,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   age                 INTEGER,
+  gender              TEXT,
   nationality         TEXT,
   personal_connection BOOLEAN,
   payload             TEXT
