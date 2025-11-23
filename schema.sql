@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- visitor table
 CREATE TABLE IF NOT EXISTS visitor (
-  id                  BIGINT PRIMARY KEY,
+  id                  BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   license_plate       TEXT UNIQUE,
   email               TEXT UNIQUE,
   password_hash       TEXT,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS session (
 
 -- visitor_event table
 CREATE TABLE IF NOT EXISTS visitor_event (
-  id            BIGSERIAL PRIMARY KEY,
+  id            BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   user_id       BIGINT REFERENCES visitor(id),
   -- session_id    UUID REFERENCES session(id),
   session_id    UUID,
