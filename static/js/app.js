@@ -686,12 +686,18 @@ function getItemId(item) {
   return item.id ?? payload.id ?? payload.item_id ?? null;
 }
 
+function setPageScrollLocked(locked) {
+  if (!document?.body) return;
+  document.body.classList.toggle('no-scroll', Boolean(locked));
+}
+
 function hideItemDetailUI() {
   detailOverlay.classList.remove('open');
   detailOverlay.setAttribute('aria-hidden', 'true');
   detailImage.src = '';
   detailImage.style.display = 'none';
   detailLinkEl.style.display = 'none';
+  setPageScrollLocked(false);
 }
 
 function showItemDetail(item) {
@@ -740,6 +746,7 @@ function showItemDetail(item) {
 
   detailOverlay.classList.add('open');
   detailOverlay.setAttribute('aria-hidden', 'false');
+  setPageScrollLocked(true);
 }
 
 async function sendInteractionEvent(itemId, eventType, eventContext = {}, { useBeacon = false } = {}) {
