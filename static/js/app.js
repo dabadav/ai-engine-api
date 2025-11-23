@@ -1,5 +1,6 @@
 // --- Map + state --------------------------------------------------------
-const ACTIVE_USER_ID = 10;
+const ACTIVE_USER_ID = 1110;
+const ACTIVE_SESSION_ID = "3c048758-287c-49db-938b-240bc91cc4b8";
 
 const map = L.map('map'); // no setView yet, we'll do it after loading
 
@@ -316,7 +317,6 @@ const detailOverlay = document.getElementById('itemDetailOverlay');
 const detailCloseBtn = document.getElementById('detailCloseBtn');
 const detailImage = document.getElementById('detailImage');
 const detailTitleEl = document.getElementById('detailTitle');
-const detailCreatorEl = document.getElementById('detailCreator');
 const detailTextEl = document.getElementById('detailText');
 const detailMetaEl = document.getElementById('detailMeta');
 const detailLinkEl = document.getElementById('detailLink');
@@ -520,6 +520,31 @@ function extractLatLonFromPayload(payload) {
   );
 }
 
+function formatDateValue(value) {
+  const formatSingle = (val) => {
+    if (val === null || val === undefined) return null;
+    if (val instanceof Date) return val.toISOString().slice(0, 10);
+    if (typeof val === 'string') {
+      const isoMatch = val.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (isoMatch) return isoMatch[1];
+      const parsed = new Date(val);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toISOString().slice(0, 10);
+      }
+      return val;
+    }
+    return String(val);
+  };
+
+  if (Array.isArray(value)) {
+    return value
+      .map(formatSingle)
+      .filter(Boolean)
+      .join(', ');
+  }
+  return formatSingle(value) || '';
+}
+
 function plotGeoResultMarkers(items, { adjustView = true } = {}) {
   geoResultsLayer.clearLayers();
   if (!Array.isArray(items) || !items.length) return;
@@ -675,7 +700,6 @@ function showItemDetail(item) {
   const created = payload.time_metadata?.dates_of_creation;
 
   detailTitleEl.textContent = title;
-  detailCreatorEl.textContent = creator ? `Creator: ${creator}` : 'Creator unknown';
   detailTextEl.textContent = text;
 
   if (imageUrl) {
@@ -693,11 +717,13 @@ function showItemDetail(item) {
   }
 
   const metaParts = [];
+  const creatorValue = creator || 'Creator unknown';
+  metaParts.push(`<dt>Creator</dt><dd>${creatorValue}</dd>`);
   if (coords) {
     metaParts.push(`<dt>Location</dt><dd>${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}</dd>`);
   }
   if (created) {
-    const value = Array.isArray(created) ? created.join(', ') : created;
+    const value = formatDateValue(created);
     metaParts.push(`<dt>Date</dt><dd>${value}</dd>`);
   }
   if (item.score !== undefined) {
@@ -711,13 +737,15 @@ function showItemDetail(item) {
   detailOverlay.setAttribute('aria-hidden', 'false');
 }
 
-async function sendInteractionEvent(itemId, eventType, { useBeacon = false } = {}) {
+async function sendInteractionEvent(itemId, eventType, eventContext = {}, { useBeacon = false } = {}) {
   if (!itemId) return;
   const payload = {
-    id: Date.now(),
+    // id: Date.now(),
     user_id: ACTIVE_USER_ID,
+    session_id: ACTIVE_SESSION_ID,
     item_id: itemId,
     event_type: eventType,
+    event_payload: eventContext || {}, // Use the empty dict default
     ts: new Date().toISOString()
   };
 
@@ -833,7 +861,7 @@ function renderResults(items, sourceLabel = 'Text') {
         ? 'Cluster unknown'
         : 'Creator unknown';
 
-    const snippetText = sourceLabel === 'Explore' ? truncateText(payload.text, 180) : '';
+        const snippetText = sourceLabel === 'Explore' ? truncateText(payload.text, 180) : '';
     let snippetEl = null;
     if (snippetText) {
       snippetEl = document.createElement('div');

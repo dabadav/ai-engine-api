@@ -1,5 +1,10 @@
+import time
 from typing import Optional, List
-from fastapi import FastAPI, Query
+from fastapi import (
+    FastAPI,
+    Request,
+    Query
+)
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
@@ -25,6 +30,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Logging & Timing Middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Logs the time taken, status code, IP, and path for every request."""
+    start_time = time.time()
+    
+    # Process Request (before endpoint runs)
+    try:
+        response = await call_next(request)
+    except Exception as e:
+        # Catch exceptions thrown by the app logic
+        logger.error(f"Request failed: {request.url.path} - {e}")
+        raise
+
+    # Process Response (after endpoint runs)
+    process_time = time.time() - start_time
+    status_code = response.status_code
+    
+    logger.info(
+        # f"Request: {request.method} {request.url.path} | "
+        # f"Status: {status_code} | "
+        f"Time: {process_time:.4f}s | "
+        f"IP: {request.client.host} | "
+        f"UA: {request.headers.get('user-agent', 'N/A')}"
+    )
+
+    return response
 
 ### UI
 #########################
@@ -153,18 +186,29 @@ async def read_item(item_id: List[int] = Query(..., example="2148")):
     }
 
 ### / DB
+@app.post("/db/guests", tags=["Insert"])
+async def create_guest():
+    """
+    Generates an unidentified session and user
+    """
+    return {
+        "status": "not implemented", 
+    }
+
 @app.post("/db/users", tags=["Insert"])
 async def create_user(user: User):
     """
-    Dumb endpoint: inserts a user row via DB_Interface.register_user.
+    Inserts a user row via DB_Interface.register_user.
     """
     db_client = DB_Interface()
-    new_id = db_client.register_user(user)
-    if new_id == "failed":
-        # you can customize the error contract later
+    result = db_client.register_user(user)
+    if result['status'] == "failed":
         return {"status": "error", "id": None}
-    return {"status": "ok", "id": new_id}
-
+    return {
+        "status": "ok", 
+        "id": result['id'], 
+        "license_plate": result['license_plate']
+    }
 
 @app.post("/db/events", tags=["Insert"])
 async def create_event(event: Event):
@@ -172,12 +216,13 @@ async def create_event(event: Event):
     Dumb endpoint: inserts an event row via DB_Interface.register_event.
     """
     db_client = DB_Interface()
-    new_id = db_client.register_event(event)
-    if new_id == "failed":
+    result = db_client.register_event(event)
+    if result['status'] == "failed":
         return {"status": "error", "id": None}
-    return {"status": "ok", "id": new_id}
-
-
+    return {
+        "status": "ok", 
+        "id": result['id'], 
+    }
 
 if __name__ == "__main__":
     import uvicorn
