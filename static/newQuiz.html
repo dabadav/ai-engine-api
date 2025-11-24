@@ -251,6 +251,99 @@
         width: min(520px, 100%);
       }
     }
+
+    .options-layout {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      width: 100%;
+    }
+
+    .options-layout .options-grid {
+      flex: 1;
+      order: 1;
+    }
+
+    .options-layout:not(.is-widget) .widget-container {
+      display: none !important;
+    }
+
+    @media (max-width: 900px) {
+      .options-layout {
+        flex-direction: column;
+      }
+    }
+
+    .widget-container {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 4px 0;
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 120px;
+      order: 2;
+      align-self: stretch;
+    }
+
+    .widget-container.visible {
+      display: flex;
+    }
+
+    .abc-letters {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      max-height: calc(100vh - 180px);
+      width: 100%;
+      gap: 4px;
+      font-size: clamp(0.64rem, 1.6vw, 0.78rem);
+      color: #64748b;
+      letter-spacing: 0.04em;
+      user-select: none;
+      padding-right: 2px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+
+    .abc-letters .active-letter {
+      color: #0f172a;
+      font-weight: 700;
+      transform: scale(1.25);
+    }
+
+    .abc-letters span {
+      transition: transform 120ms ease, color 120ms ease;
+      padding: 3px 5px;
+      border-radius: 8px;
+    }
+
+    .abc-letters span:hover {
+      color: #0f172a;
+      transform: scale(1.15);
+      background: rgba(15, 23, 42, 0.06);
+    }
+
+    @media (max-width: 900px) {
+      .widget-container {
+        max-width: none;
+        width: 100%;
+      }
+      .abc-letters {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        max-height: none;
+        width: 100%;
+        gap: 6px 8px;
+      }
+      .abc-letters span {
+        padding: 4px 6px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -273,7 +366,13 @@
         <h1 id="questionTitle"></h1>
       </div>
 
-      <section class="options-grid" id="optionsGrid"></section>
+      <div class="options-layout" id="optionsLayout">
+        <div class="widget-container" id="widgetContainer" hidden>
+          <div class="abc-letters" id="abcLetters"></div>
+        </div>
+
+        <section class="options-grid" id="optionsGrid"></section>
+      </div>
       <p class="quiz-note" id="questionSubtitle"></p>
 
       <div class="next-card" id="quizActions">
@@ -304,9 +403,27 @@
     const summaryCard = document.getElementById("summaryCard");
     const summaryList = document.getElementById("summaryList");
     const quizActions = document.getElementById("quizActions");
+    const optionsLayout = document.getElementById("optionsLayout");
+    const widgetContainer = document.getElementById("widgetContainer");
+    const abcLetters = document.getElementById("abcLetters");
 
     const answers = {};
     let currentStep = 0;
+    const widgetState = {
+      abcLetter: "A",
+    };
+
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+    function renderAbcLetters() {
+      if (!abcLetters) return;
+      abcLetters.innerHTML = alphabet
+        .map((ltr) => {
+          const active = ltr === widgetState.abcLetter ? "active-letter" : "";
+          return `<span class="${active}">${ltr}</span>`;
+        })
+        .join("");
+    }
 
     function updateProgress() {
       if (!steps.length) return;
@@ -318,19 +435,34 @@
       if (!steps.length) return;
       const step = steps[currentStep];
       const autoAdvance = Boolean(step.autoAdvance);
+      const useAbcWidget = step.widget === "abc_scroll";
 
       summaryCard.classList.remove("visible");
       optionsGrid.hidden = false;
       quizActions.hidden = autoAdvance;
       quizActions.style.display = autoAdvance ? "none" : "flex";
+      optionsLayout.classList.toggle("is-widget", useAbcWidget);
+      widgetContainer.hidden = !useAbcWidget;
+      widgetContainer.classList.toggle("visible", useAbcWidget);
 
       questionLabel.textContent = `${currentStep + 1} of ${steps.length}`;
       questionTitle.textContent = step.title;
       questionSubtitle.textContent = step.subtitle || "";
 
       const currentAnswer = answers[step.id]?.value;
+      if (useAbcWidget) {
+        renderAbcLetters();
+      }
 
-      optionsGrid.innerHTML = step.options
+      const activeLetter = useAbcWidget ? widgetState.abcLetter : null;
+      const filteredOptions = useAbcWidget
+        ? step.options.filter((opt) =>
+            (opt.label || "").toUpperCase().startsWith(activeLetter || "A")
+          )
+        : step.options;
+      const optionsToRender = filteredOptions.length ? filteredOptions : step.options;
+
+      optionsGrid.innerHTML = optionsToRender
         .map(option => {
           const emoji = option.emoji ? `<span class="option-emoji" aria-hidden="true">${option.emoji}</span>` : "";
           const description = option.desc ? `<span class="option-text">${option.desc}</span>` : "";
@@ -406,6 +538,28 @@
         renderStep();
       }
     });
+
+      if (abcLetters) {
+        abcLetters.addEventListener("click", (e) => {
+          const span = e.target.closest("span");
+          if (!span) return;
+          const letter = span.textContent?.trim().toUpperCase();
+          if (alphabet.includes(letter)) {
+            widgetState.abcLetter = letter;
+            renderStep();
+          }
+        });
+
+      abcLetters.addEventListener("mousemove", (e) => {
+        const span = e.target.closest("span");
+        if (!span) return;
+        const letter = span.textContent?.trim().toUpperCase();
+        if (alphabet.includes(letter) && letter !== widgetState.abcLetter) {
+          widgetState.abcLetter = letter;
+          renderStep();
+        }
+      });
+    }
 
     async function initQuiz() {
       try {

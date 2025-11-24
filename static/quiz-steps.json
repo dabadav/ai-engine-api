@@ -33,6 +33,7 @@
     "alias": "Nationality",
     "title": "What is your nationality?",
     "subtitle": "Select the option that best describes you.",
+    "widget": "abc_scroll",
     "autoAdvance": false,
     "options": [
       { "value": "afghanistan", "label": "Afghanistan", "emoji": "🇦🇫" },
