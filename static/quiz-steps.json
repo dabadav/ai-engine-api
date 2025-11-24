@@ -32,7 +32,7 @@
     "id": "nationality",
     "alias": "Nationality",
     "title": "What is your nationality?",
-    "subtitle": "Select the option that best describes you.",
+    "subtitle": "",
     "widget": "abc_scroll",
     "autoAdvance": false,
     "options": [

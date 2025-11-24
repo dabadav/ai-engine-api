@@ -314,6 +314,27 @@
         transform: translateY(0);
       }
     }
+
+    @media (max-width: 640px) {
+      .overlay {
+        padding: 0;
+        align-items: flex-end;
+      }
+      .email-card {
+        width: 100%;
+        max-width: none;
+        height: auto;
+        border-radius: 18px 18px 0 0;
+        padding: 18px 16px 20px;
+        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.35);
+      }
+      .email-icon {
+        margin-top: 12px;
+      }
+      .btn-ghost {
+        margin: 0 auto 4px;
+      }
+    }
   </style>
 </head>
 <body>

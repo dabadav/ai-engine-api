@@ -298,7 +298,7 @@ body.landing-body {
 @media (max-width: 768px) {
   .landing-shell {
     padding: 0;
-    gap: 24px;
+    gap: 16px;
   }
 
   .landing-shell .mode-bar {
@@ -307,8 +307,8 @@ body.landing-body {
 
   .landing-content {
     flex-direction: column;
-    padding: 0 16px 24px;
-    gap: 24px;
+    padding: 0 16px 16px;
+    gap: 14px;
   }
 
   .landing-search h1 {

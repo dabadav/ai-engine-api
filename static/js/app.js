@@ -846,7 +846,10 @@ function renderResults(items, sourceLabel = 'Text') {
     const payload = item.payload || {};
 
     const title = payload.title || '(No title)';
-    const creator = payload.topic_label || payload.creator || '';
+    const clusterLabel = sourceLabel === 'Explore'
+      ? (payload.cluster_label || payload.topic_label || payload.topic_name || '')
+      : null;
+    const creator = clusterLabel || payload.creator || '';
     const imageUrl = payload.image_url || '';
     const publicUrl = payload.public_url || '';
 
@@ -1570,10 +1573,12 @@ function neighborToResult(neighbor, qdrantPayload) {
     : `Document ${point.id}`;
   const payload = { ...(qdrantPayload || {}) };
 
-  if (!payload.title) payload.title = point.topic || fallbackTitle;
+  // Preserve item title if present; otherwise fall back to snippet or id (not cluster label)
+  if (!payload.title) payload.title = fallbackTitle;
   if (!payload.text) payload.text = snippet;
   if (!payload.topic_label) payload.topic_label = point.label || "";
   if (!payload.topic_name) payload.topic_name = point.topic || "";
+  if (!payload.cluster_label) payload.cluster_label = point.label || point.topic || "";
   payload.explore_distance = distance;
 
   return {

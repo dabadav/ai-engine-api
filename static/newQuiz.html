@@ -128,6 +128,9 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
+      max-height: 55vh;
+      overflow-y: auto;
+      padding-right: 4px;
     }
 
     .option-card {
@@ -251,12 +254,38 @@
         width: min(520px, 100%);
       }
     }
+    @media (max-width: 640px) {
+      body {
+        padding: 12px 12px 16px;
+      }
+      .quiz-container {
+        width: 100%;
+      }
+      .content-panel {
+        width: 100%;
+      }
+      .options-grid,
+      .option-card,
+      .summary-card {
+        width: 100%;
+      }
+      .summary-card {
+        padding: 0;
+      }
+      .next-card {
+        width: 100%;
+      }
+      .next-btn {
+        width: 100%;
+      }
+    }
 
     .options-layout {
       display: flex;
       align-items: flex-start;
-      gap: 16px;
+      gap: 8px;
       width: 100%;
+      flex-wrap: nowrap;
     }
 
     .options-layout .options-grid {
@@ -268,82 +297,123 @@
       display: none !important;
     }
 
-    @media (max-width: 900px) {
-      .options-layout {
-        flex-direction: column;
-      }
-    }
+@media (max-width: 900px) {
+  .options-layout {
+    position: relative;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .options-grid {
+    max-height: 55vh;
+    padding-right: 74px;
+  }
+  .widget-container {
+    position: fixed;
+    top: 12%;
+    bottom: 12%;
+    right: 8px;
+    transform: none;
+    max-width: 64px;
+    width: 64px;
+    padding: 4px 0;
+    background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.94) 50%);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+  }
+  .abc-letters {
+    flex: 1;
+    max-height: none;
+    font-size: 0.64rem;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    overflow-y: hidden;
+  }
+}
 
-    .widget-container {
-      width: 100%;
-      background: transparent;
-      border: none;
-      border-radius: 0;
-      padding: 4px 0;
-      display: none;
-      flex-direction: column;
-      gap: 12px;
-      max-width: 120px;
-      order: 2;
-      align-self: stretch;
-    }
+.widget-container {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 2px 0;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 96px;
+  order: 2;
+  align-self: stretch;
+  flex-shrink: 0;
+  width: 96px;
+}
 
     .widget-container.visible {
       display: flex;
     }
 
-    .abc-letters {
-      display: inline-flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      max-height: calc(100vh - 180px);
-      width: 100%;
-      gap: 4px;
-      font-size: clamp(0.64rem, 1.6vw, 0.78rem);
-      color: #64748b;
-      letter-spacing: 0.04em;
-      user-select: none;
-      padding-right: 2px;
-      overflow-y: auto;
-      scrollbar-width: thin;
-    }
+.abc-letters {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  gap: 2px;
+  font-size: clamp(0.58rem, 1vw, 0.68rem);
+  color: #64748b;
+  letter-spacing: 0.04em;
+  user-select: none;
+  padding-right: 2px;
+  overflow: visible;
+  flex-wrap: nowrap;
+}
 
-    .abc-letters .active-letter {
-      color: #0f172a;
-      font-weight: 700;
-      transform: scale(1.25);
-    }
+.abc-letters .active-letter {
+  color: #0f172a;
+  font-weight: 700;
+}
 
-    .abc-letters span {
-      transition: transform 120ms ease, color 120ms ease;
-      padding: 3px 5px;
-      border-radius: 8px;
-    }
+.abc-letters span {
+  transition: transform 120ms ease, color 120ms ease;
+  padding: 2px 3px;
+  border-radius: 8px;
+  width: 32px;
+  text-align: center;
+  display: block;
+  line-height: 1.2;
+}
 
-    .abc-letters span:hover {
-      color: #0f172a;
-      transform: scale(1.15);
-      background: rgba(15, 23, 42, 0.06);
-    }
+.abc-letters span:hover {
+  color: #0f172a;
+  background: rgba(15, 23, 42, 0.06);
+}
 
     @media (max-width: 900px) {
-      .widget-container {
-        max-width: none;
-        width: 100%;
-      }
-      .abc-letters {
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: center;
-        max-height: none;
-        width: 100%;
-        gap: 6px 8px;
-      }
-      .abc-letters span {
-        padding: 4px 6px;
-      }
-    }
+  .widget-container {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    max-width: 64px;
+    width: 64px;
+    padding: 2px 0;
+  }
+  .abc-letters {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    max-height: 42vh;
+    width: 100%;
+    padding-right: 0;
+  }
+  .abc-letters span {
+    padding: 2px 3px;
+    width: 28px;
+  }
+}
   </style>
 </head>
 <body>
@@ -460,7 +530,7 @@
             (opt.label || "").toUpperCase().startsWith(activeLetter || "A")
           )
         : step.options;
-      const optionsToRender = filteredOptions.length ? filteredOptions : step.options;
+      const optionsToRender = filteredOptions;
 
       optionsGrid.innerHTML = optionsToRender
         .map(option => {
@@ -539,26 +609,53 @@
       }
     });
 
-      if (abcLetters) {
-        abcLetters.addEventListener("click", (e) => {
-          const span = e.target.closest("span");
-          if (!span) return;
-          const letter = span.textContent?.trim().toUpperCase();
-          if (alphabet.includes(letter)) {
-            widgetState.abcLetter = letter;
-            renderStep();
+    if (abcLetters) {
+      function selectClosestLetter(clientX, clientY) {
+        const spans = Array.from(abcLetters.querySelectorAll("span"));
+        if (!spans.length) return false;
+        let best = null;
+        let bestDist = Infinity;
+        spans.forEach((el) => {
+          const rect = el.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          const dx = cx - clientX;
+          const dy = cy - clientY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = el;
           }
         });
+        if (!best) return false;
+        const letter = best.textContent?.trim().toUpperCase();
+        if (alphabet.includes(letter) && letter !== widgetState.abcLetter) {
+          widgetState.abcLetter = letter;
+          renderStep();
+          return true;
+        }
+        return false;
+      }
 
-      abcLetters.addEventListener("mousemove", (e) => {
+      abcLetters.addEventListener("click", (e) => {
         const span = e.target.closest("span");
         if (!span) return;
         const letter = span.textContent?.trim().toUpperCase();
-        if (alphabet.includes(letter) && letter !== widgetState.abcLetter) {
+        if (alphabet.includes(letter)) {
           widgetState.abcLetter = letter;
           renderStep();
         }
       });
+
+      abcLetters.addEventListener("mousemove", (e) => {
+        selectClosestLetter(e.clientX, e.clientY);
+      });
+
+      abcLetters.addEventListener("touchmove", (e) => {
+        if (!e.touches || !e.touches.length) return;
+        const touch = e.touches[0];
+        selectClosestLetter(touch.clientX, touch.clientY);
+      }, { passive: true });
     }
 
     async function initQuiz() {
