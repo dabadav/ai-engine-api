@@ -4,8 +4,8 @@ services:
     build: .
     # volumes:
     #   - ./../ai-engine/src/ai_engine:/app/ai_engine
-    env_file:
-      - .env
+    # env_file:
+    #   - .env
     container_name: ai_engine_api
     depends_on:
       db:
