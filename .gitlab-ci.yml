@@ -50,7 +50,7 @@ variables:
 build:
   stage: build
   script:
-  - echo "Creating .env file from CI/CD variables..."
+    - echo "Creating .env file from CI/CD variables..."
     - echo "QDRANT_API_URL=\"$QDRANT_API_URL\"" > .env
     - echo "QDRANT_API_KEY=\"$QDRANT_API_KEY\"" >> .env
     - echo "OPENROUTER_API_URL=\"$OPENROUTER_API_URL\"" >> .env
