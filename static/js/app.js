@@ -329,8 +329,8 @@ const detailLinkEl = document.getElementById('detailLink');
 // Mode switching (top bar)
 const tabButtons = document.querySelectorAll('.mode-tab');
 const modeViews = document.querySelectorAll('.mode-view');
-const btnGenerateNarrative = document.getElementById('btnGenerateNarrative');
-const narrativeContainer = document.getElementById('narrativeContainer');
+const btnGenerateNarrative = null; // narrative temporarily disabled
+const narrativeContainer = null; // narrative temporarily disabled
 const intentOverlay = document.getElementById('intentOverlay');
 const intentChoices = document.querySelectorAll('.intent-choice');
 
@@ -349,6 +349,10 @@ function setMode(mode) {
   if (mode === 'results') {
     // Allow layout to settle before forcing Leaflet to recalc
     setTimeout(() => map.invalidateSize(), 150);
+  }
+  // narrative mode temporarily disabled
+  if (mode === 'narrative') {
+    return;
   }
 }
 
@@ -833,7 +837,7 @@ function renderResults(items, sourceLabel = 'Text') {
       lastResultsById.set(String(id), it);
     }
   });
-  btnGenerateNarrative.disabled = !lastResultsItems.length;
+  
 
   if (!items.length) {
     resultsList.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
@@ -1007,6 +1011,7 @@ function renderNarrativeConnection(rel) {
 
 // --- Narrative generation / rendering (NEW) -----------------------------
 function renderNarrative(narrative) {
+  if (!narrativeContainer) return;
   if (!narrative) {
     narrativeContainer.innerHTML =
       '<div class="empty-state">No narrative available.</div>';
@@ -1089,7 +1094,7 @@ function renderNarrative(narrative) {
 }
 
 async function generateNarrativeFromResults() {
-  if (!lastResultsItems.length) return;
+  if (!lastResultsItems.length || !narrativeContainer) return;
 
   narrativeContainer.innerHTML =
     '<div class="empty-state">Generating narrative…</div>';
@@ -1115,10 +1120,6 @@ async function generateNarrativeFromResults() {
   }
 }
 
-btnGenerateNarrative.addEventListener('click', () => {
-  generateNarrativeFromResults();
-  setMode('narrative');
-});
 
 // --- API calls (search) -------------------------------------------------
 const btnTextSearch = document.getElementById('btnTextSearch');
