@@ -50,23 +50,6 @@ variables:
 build:
   stage: build
   script:
-    - echo "Creating .env file from CI/CD variables..."
-    - echo "QDRANT_API_URL=\"$QDRANT_API_URL\"" > .env
-    - echo "QDRANT_API_KEY=\"$QDRANT_API_KEY\"" >> .env
-    - echo "OPENROUTER_API_URL=\"$OPENROUTER_API_URL\"" >> .env
-    - echo "OPENROUTER_API_KEY=\"$OPENROUTER_API_KEY\"" >> .env
-    - echo "DB_NAME=$DB_NAME" >> .env
-    - echo "DB_USER=$DB_USER" >> .env
-    - echo "DB_PASSWORD=$DB_PASSWORD" >> .env
-    - echo "DB_HOST=$DB_HOST" >> .env
-    - echo "KEYCLOAK_BASE_URL=$KEYCLOAK_BASE_URL" >> .env
-    - echo "KEYCLOAK_REALM=$KEYCLOAK_REALM" >> .env
-    - echo "KEYCLOAK_CLIENT_ID=$KEYCLOAK_CLIENT_ID" >> .env
-    - echo "KEYCLOAK_CLIENT_SECRET=$KEYCLOAK_CLIENT_SECRET" >> .env
-    - echo "KEYCLOAK_USERNAME=$KEYCLOAK_USERNAME" >> .env
-    - echo "KEYCLOAK_PASSWORD=$KEYCLOAK_PASSWORD" >> .env
-    - echo "KEYCLOAK_SAFETY_MARGIN_SECONDS=$KEYCLOAK_SAFETY_MARGIN_SECONDS" >> .env
-    - echo "OLLAMA_BASE_URL=$OLLAMA_BASE_URL" >> .env
     - docker compose build api
     - docker tag ai-engine-api "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
     - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
