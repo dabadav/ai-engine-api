@@ -8,18 +8,7 @@ default:
   services:
     - docker:24.0.5-dind
   before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-    # Install Docker Compose V2
-    - apk add --no-cache curl  # Ensure curl is available in the Alpine-based docker image
-    # Download and install the Docker Compose binary
-    - COMPOSE_VERSION="v2.24.6" # Use a stable version
-    - COMPOSE_URL="https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-x86_64"
-    - curl -L ${COMPOSE_URL} -o /usr/local/bin/docker-compose
-    - chmod +x /usr/local/bin/docker-compose
-    # Create symlink so 'docker compose' command works (optional, but good practice)
-    - ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
-
-    - docker info # Original check
+    - docker info
 
 variables:
   # When using dind service, you must instruct Docker to talk with
@@ -46,30 +35,27 @@ variables:
   DOCKER_TLS_VERIFY: 1
   DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
 
-# Build main image
-build:
+build-app:
   stage: build
-  script:
-    - echo "Creating .env file from CI/CD variables..."
-    - echo "QDRANT_API_URL=\"$QDRANT_API_URL\"" > .env
-    - echo "QDRANT_API_KEY=\"$QDRANT_API_KEY\"" >> .env
-    - echo "OPENROUTER_API_URL=\"$OPENROUTER_API_URL\"" >> .env
-    - echo "OPENROUTER_API_KEY=\"$OPENROUTER_API_KEY\"" >> .env
-    - echo "DB_NAME=$DB_NAME" >> .env
-    - echo "DB_USER=$DB_USER" >> .env
-    - echo "DB_PASSWORD=$DB_PASSWORD" >> .env
-    - echo "DB_HOST=$DB_HOST" >> .env
-    - echo "KEYCLOAK_BASE_URL=$KEYCLOAK_BASE_URL" >> .env
-    - echo "KEYCLOAK_REALM=$KEYCLOAK_REALM" >> .env
-    - echo "KEYCLOAK_CLIENT_ID=$KEYCLOAK_CLIENT_ID" >> .env
-    - echo "KEYCLOAK_CLIENT_SECRET=$KEYCLOAK_CLIENT_SECRET" >> .env
-    - echo "KEYCLOAK_USERNAME=$KEYCLOAK_USERNAME" >> .env
-    - echo "KEYCLOAK_PASSWORD=$KEYCLOAK_PASSWORD" >> .env
-    - echo "KEYCLOAK_SAFETY_MARGIN_SECONDS=$KEYCLOAK_SAFETY_MARGIN_SECONDS" >> .env
-    - echo "OLLAMA_BASE_URL=$OLLAMA_BASE_URL" >> .env
-    - docker compose build api
-    - docker tag ai-engine-api "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
-    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
 
+  # Login to Gitlab Docker registry using built-in variables
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+
+  # Build and push the container image
+  # The name will be <repository-name>:<branch-name>
+  script:
+    # - docker build --pull -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG" .
+    # - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+    - docker build --pull -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
+
+  # Run this step only on:
+  # - Master branch
+  # - Releases (matching Semantic Versioning)
+  # rules:
+  #   - if: $CI_COMMIT_REF_NAME == "master" && '$CI_COMMIT_TAG =~ \d+\.\d+\.\d+'
+
+  # Run this step only on releases
   only:
     - tags
